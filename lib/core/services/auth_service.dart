@@ -1,0 +1,70 @@
+import 'package:supabase_flutter/supabase_flutter.dart';
+
+class AuthService {
+  final SupabaseClient _client;
+
+  AuthService(this._client);
+
+  Future<AuthResponse> signUp({
+    required String email,
+    required String password,
+    required String fullName,
+    required String username,
+  }) async {
+    final response = await _client.auth.signUp(
+      email: email,
+      password: password,
+    );
+
+    if (response.user != null) {
+      await _client.from('profiles').upsert({
+        'id': response.user!.id,
+        'email': email,
+        'username': username,
+        'full_name': fullName,
+      }, onConflict: 'id');
+    }
+
+    return response;
+  }
+
+  Future<AuthResponse> signIn({
+    required String email,
+    required String password,
+  }) async {
+    return _client.auth.signInWithPassword(
+      email: email,
+      password: password,
+    );
+  }
+
+  Future<void> signOut() async {
+    await _client.auth.signOut();
+  }
+
+  /// Returns true if the username is available (not taken).
+  Future<bool> isUsernameAvailable(String username) async {
+    final data = await _client
+        .from('profiles')
+        .select('id')
+        .eq('username', username.trim().toLowerCase())
+        .maybeSingle();
+    return data == null;
+  }
+
+  /// Creates a profile row for an already-authenticated user.
+  /// Used when sign-up succeeded but profile creation failed.
+  Future<void> createProfile({
+    required String username,
+    required String fullName,
+  }) async {
+    final user = _client.auth.currentUser;
+    if (user == null) throw Exception('No authenticated user.');
+    await _client.from('profiles').upsert({
+      'id': user.id,
+      'email': user.email ?? '',
+      'username': username.trim().toLowerCase(),
+      'full_name': fullName.trim(),
+    }, onConflict: 'id');
+  }
+}

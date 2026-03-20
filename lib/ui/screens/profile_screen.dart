@@ -1,0 +1,612 @@
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
+import 'dart:math' as math;
+
+import '../../core/models/hobby.dart';
+import '../../core/providers/auth_providers.dart';
+import '../../core/providers/hobby_providers.dart';
+import '../../core/providers/profile_providers.dart';
+import '../../core/theme_provider.dart';
+import '../widgets/app_cached_image.dart';
+
+class ProfileScreen extends ConsumerStatefulWidget {
+  const ProfileScreen({super.key});
+
+  @override
+  ConsumerState<ProfileScreen> createState() => _ProfileScreenState();
+}
+
+class _ProfileScreenState extends ConsumerState<ProfileScreen> {
+  int _retryCount = 0;
+  bool _isRetrying = false;
+
+  void _scheduleRetry() {
+    if (_isRetrying || _retryCount >= 4) return;
+    _isRetrying = true;
+    Future.delayed(const Duration(milliseconds: 1500), () {
+      if (mounted) {
+        setState(() {
+          _retryCount++;
+          _isRetrying = false;
+        });
+        ref.invalidate(currentProfileProvider);
+      }
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = ref.watch(appColorSchemeProvider);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final userId = ref.watch(currentUserIdProvider);
+
+    if (userId == null) {
+      return Scaffold(
+        backgroundColor: isDark
+            ? const Color(0xFF0F0F17)
+            : const Color(0xFFF2F4F8),
+        body: const Center(child: CircularProgressIndicator()),
+      );
+    }
+
+    final profileAsync = ref.watch(currentProfileProvider);
+    final hobbiesAsync = ref.watch(userHobbiesProvider(userId));
+    final allHobbiesAsync = ref.watch(allHobbiesProvider);
+
+    return Scaffold(
+      backgroundColor: isDark
+          ? const Color(0xFF0F0F17)
+          : const Color(0xFFF2F4F8),
+      body: profileAsync.when(
+        loading: () => const Center(child: CircularProgressIndicator()),
+        error: (e, _) {
+          _scheduleRetry();
+          return _retryCount >= 4
+              ? _RetryWidget(
+                  isDark: isDark,
+                  onRetry: () {
+                    setState(() {
+                      _retryCount = 0;
+                      _isRetrying = false;
+                    });
+                    ref.invalidate(currentProfileProvider);
+                  },
+                )
+              : const Center(child: CircularProgressIndicator());
+        },
+        data: (profile) {
+          if (profile == null) {
+            _scheduleRetry();
+            return _retryCount >= 4
+                ? _RetryWidget(
+                    isDark: isDark,
+                    onRetry: () {
+                      setState(() {
+                        _retryCount = 0;
+                        _isRetrying = false;
+                      });
+                      ref.invalidate(currentProfileProvider);
+                    },
+                  )
+                : const Center(child: CircularProgressIndicator());
+          }
+          _retryCount = 0;
+
+          final userHobbies = hobbiesAsync.value ?? [];
+          final sortedUserHobbies = [...userHobbies]
+            ..sort((a, b) => (b.isPrimary ? 1 : 0) - (a.isPrimary ? 1 : 0));
+          final hobbyEntries = sortedUserHobbies
+              .where((uh) => uh.hobby?.name != null)
+              .map((uh) => (name: uh.hobby!.name, isPrimary: uh.isPrimary))
+              .toList();
+          final allHobbies = allHobbiesAsync.value ?? [];
+
+          return SafeArea(
+            child: CustomScrollView(
+              physics: const BouncingScrollPhysics(),
+              slivers: [
+                SliverPadding(
+                  padding: const EdgeInsets.symmetric(horizontal: 24),
+                  sliver: SliverList(
+                    delegate: SliverChildListDelegate([
+                      const SizedBox(height: 10),
+                      // ── Menu icon — navigates to Settings full page ────
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.end,
+                        children: [
+                          GestureDetector(
+                            onTap: () {
+                              HapticFeedback.lightImpact();
+                              context.push('/settings');
+                            },
+                            child: Icon(
+                              Icons.menu_rounded,
+                              size: 26,
+                              color: isDark ? Colors.white70 : Colors.black54,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 16),
+                      // ── Identity row ───────────────────────────────────
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          _buildAvatar(colors, profile.avatarUrl),
+                          const SizedBox(width: 16),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const SizedBox(height: 4),
+                                Row(
+                                  children: [
+                                    Flexible(
+                                      child: Text(
+                                        profile.fullName,
+                                        style: Theme.of(context)
+                                            .textTheme
+                                            .headlineSmall
+                                            ?.copyWith(
+                                              fontWeight: FontWeight.w800,
+                                              fontSize: 20,
+                                              height: 1.1,
+                                            ),
+                                      ),
+                                    ),
+                                    if (profile.isVerified) ...[
+                                      const SizedBox(width: 6),
+                                      Icon(
+                                        Icons.verified_rounded,
+                                        color: colors.primary,
+                                        size: 18,
+                                      ),
+                                    ],
+                                  ],
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  '@${profile.username}',
+                                  style: TextStyle(
+                                    color: Colors.grey.shade500,
+                                    fontWeight: FontWeight.w500,
+                                    fontSize: 13,
+                                  ),
+                                ),
+                                if (profile.location != null &&
+                                    profile.location!.isNotEmpty) ...[
+                                  const SizedBox(height: 4),
+                                  Row(
+                                    children: [
+                                      Icon(Icons.location_on_rounded,
+                                          size: 13,
+                                          color: Colors.grey.shade500),
+                                      const SizedBox(width: 3),
+                                      Flexible(
+                                        child: Text(
+                                          profile.location!,
+                                          style: TextStyle(
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.w500,
+                                            color: Colors.grey.shade500,
+                                          ),
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                                const SizedBox(height: 8),
+                                Row(
+                                  children: [
+                                    GestureDetector(
+                                      onTap: () {
+                                        HapticFeedback.lightImpact();
+                                        context.push(
+                                          '/follow-list/${profile.id}/0?name=${Uri.encodeComponent(profile.fullName)}',
+                                        );
+                                      },
+                                      child: _buildCompactStat(
+                                        context,
+                                        _formatCount(profile.followerCount),
+                                        'Followers',
+                                        isDark,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 16),
+                                    GestureDetector(
+                                      onTap: () {
+                                        HapticFeedback.lightImpact();
+                                        context.push(
+                                          '/follow-list/${profile.id}/1?name=${Uri.encodeComponent(profile.fullName)}',
+                                        );
+                                      },
+                                      child: _buildCompactStat(
+                                        context,
+                                        _formatCount(profile.followingCount),
+                                        'Following',
+                                        isDark,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+
+                      const SizedBox(height: 12),
+
+                      if (profile.bio != null && profile.bio!.isNotEmpty)
+                        Text(
+                          profile.bio!,
+                          style: TextStyle(
+                            fontSize: 14,
+                            height: 1.4,
+                            color: isDark
+                                ? Colors.grey.shade300
+                                : Colors.grey.shade800,
+                            fontWeight: FontWeight.w400,
+                          ),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+
+                      const SizedBox(height: 12),
+
+                      Row(
+                        children: [
+                          Expanded(
+                            child: _buildActionButton(
+                              context,
+                              'Edit Profile',
+                              isPrimary: true,
+                              colors: colors,
+                              isDark: isDark,
+                              onTap: () => context.push('/edit-profile'),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: _buildActionButton(
+                              context,
+                              'Share Profile',
+                              isPrimary: false,
+                              colors: colors,
+                              isDark: isDark,
+                            ),
+                          ),
+                        ],
+                      ),
+
+                      const SizedBox(height: 12),
+                    ]),
+                  ),
+                ),
+
+                if (hobbyEntries.isNotEmpty) ...[
+                  SliverToBoxAdapter(
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 24),
+                      child: Text(
+                        'MY VIBE',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: 1.2,
+                          color: Colors.grey.shade500,
+                        ),
+                      ),
+                    ),
+                  ),
+                  SliverToBoxAdapter(
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(24, 8, 24, 0),
+                      child: _buildStickerWall(
+                          context, isDark, hobbyEntries, allHobbies),
+                    ),
+                  ),
+                ],
+
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(24, 20, 24, 12),
+                    child: Text(
+                      'MY REELS',
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 1.2,
+                        color: Colors.grey.shade500,
+                      ),
+                    ),
+                  ),
+                ),
+
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 24),
+                    child: Container(
+                      height: 180,
+                      decoration: BoxDecoration(
+                        color: isDark
+                            ? Colors.white.withValues(alpha: 0.04)
+                            : Colors.black.withValues(alpha: 0.03),
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(
+                          color: isDark
+                              ? Colors.white.withValues(alpha: 0.07)
+                              : Colors.black.withValues(alpha: 0.06),
+                        ),
+                      ),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Container(
+                            width: 56,
+                            height: 56,
+                            decoration: BoxDecoration(
+                              color: isDark
+                                  ? Colors.white.withValues(alpha: 0.07)
+                                  : Colors.black.withValues(alpha: 0.05),
+                              shape: BoxShape.circle,
+                            ),
+                            child: Icon(
+                              Icons.videocam_outlined,
+                              size: 26,
+                              color: Colors.grey.shade500,
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          Text(
+                            'No reels yet',
+                            style: TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w700,
+                              color: isDark ? Colors.white70 : Colors.black54,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            'Share your first video',
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: Colors.grey.shade500,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+
+                const SliverToBoxAdapter(child: SizedBox(height: 24)),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  // ── Helpers ───────────────────────────────────────────────────────────────
+
+  String _formatCount(int count) {
+    if (count >= 1000) return '${(count / 1000).toStringAsFixed(1)}K';
+    return count.toString();
+  }
+
+  Widget _buildAvatar(AppColorScheme colors, String? avatarUrl) {
+    return Container(
+      width: 88,
+      height: 88,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: Colors.white,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.1),
+            blurRadius: 20,
+            offset: const Offset(0, 10),
+          ),
+        ],
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(4),
+        child: AppCachedImage(
+          imageUrl: avatarUrl,
+          width: 80,
+          height: 80,
+          borderRadius: BorderRadius.circular(50),
+          errorWidget: Container(
+            color: Colors.grey.shade300,
+            child: Icon(Icons.person,
+                size: 40, color: Colors.grey.shade600),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCompactStat(
+    BuildContext context,
+    String value,
+    String label,
+    bool isDark,
+  ) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          value,
+          style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16),
+        ),
+        Text(
+          label,
+          style: TextStyle(
+            color: isDark ? Colors.grey.shade500 : Colors.grey.shade600,
+            fontSize: 13,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildActionButton(
+    BuildContext context,
+    String label, {
+    required bool isPrimary,
+    required AppColorScheme colors,
+    required bool isDark,
+    VoidCallback? onTap,
+  }) {
+    return GestureDetector(
+      onTap: () {
+        HapticFeedback.lightImpact();
+        onTap?.call();
+      },
+      child: Container(
+        height: 44,
+        decoration: BoxDecoration(
+          color: isPrimary
+              ? (isDark ? Colors.white : Colors.black)
+              : (isDark
+                    ? Colors.white.withValues(alpha: 0.08)
+                    : Colors.white.withValues(alpha: 0.8)),
+          borderRadius: BorderRadius.circular(14),
+          border: isPrimary
+              ? null
+              : Border.all(
+                  color: isDark
+                      ? Colors.white.withValues(alpha: 0.1)
+                      : Colors.black.withValues(alpha: 0.05),
+                ),
+        ),
+        child: Center(
+          child: Text(
+            label,
+            style: TextStyle(
+              color: isPrimary
+                  ? (isDark ? Colors.black : Colors.white)
+                  : (isDark ? Colors.white : Colors.black),
+              fontWeight: FontWeight.w700,
+              fontSize: 14,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildStickerWall(
+    BuildContext context,
+    bool isDark,
+    List<({String name, bool isPrimary})> hobbyEntries,
+    List<Hobby> allHobbies,
+  ) {
+    final random = math.Random(42);
+
+    return Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      children: hobbyEntries.map((entry) {
+        final hobby =
+            allHobbies.where((h) => h.name == entry.name).firstOrNull;
+        final color = hobby?.colorValue ?? const Color(0xFF6C63FF);
+        final icon = hobby?.icon ?? '✨';
+        final rotation = (random.nextDouble() - 0.5) * 0.1;
+
+        return Transform.rotate(
+          angle: entry.isPrimary ? 0 : rotation,
+          child: Container(
+            padding: EdgeInsets.symmetric(
+              horizontal: entry.isPrimary ? 12 : 10,
+              vertical: entry.isPrimary ? 8 : 7,
+            ),
+            decoration: BoxDecoration(
+              color: entry.isPrimary
+                  ? color.withValues(alpha: isDark ? 0.25 : 0.12)
+                  : (isDark ? const Color(0xFF1E1E28) : Colors.white),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: color.withValues(
+                    alpha: entry.isPrimary ? 0.6 : 0.3),
+                width: entry.isPrimary ? 2 : 1.5,
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: color.withValues(
+                      alpha: entry.isPrimary ? 0.22 : 0.12),
+                  blurRadius: entry.isPrimary ? 10 : 6,
+                  offset: const Offset(0, 3),
+                ),
+              ],
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(icon,
+                    style:
+                        TextStyle(fontSize: entry.isPrimary ? 15 : 14)),
+                const SizedBox(width: 6),
+                Text(
+                  entry.name,
+                  style: TextStyle(
+                    fontWeight: FontWeight.w800,
+                    color: entry.isPrimary
+                        ? color
+                        : (isDark ? Colors.white : Colors.black87),
+                    fontSize: entry.isPrimary ? 13 : 12,
+                  ),
+                ),
+                if (entry.isPrimary) ...[
+                  const SizedBox(width: 4),
+                  const Text('⭐', style: TextStyle(fontSize: 11)),
+                ],
+              ],
+            ),
+          ),
+        );
+      }).toList(),
+    );
+  }
+}
+
+class _RetryWidget extends StatelessWidget {
+  final bool isDark;
+  final VoidCallback onRetry;
+
+  const _RetryWidget({required this.isDark, required this.onRetry});
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.cloud_off_rounded, size: 48, color: Colors.grey.shade500),
+          const SizedBox(height: 12),
+          Text(
+            'Unable to load profile',
+            style: TextStyle(
+              color: isDark ? Colors.white70 : Colors.black54,
+              fontSize: 16,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+          const SizedBox(height: 16),
+          ElevatedButton.icon(
+            onPressed: onRetry,
+            icon: const Icon(Icons.refresh_rounded),
+            label: const Text('Retry'),
+          ),
+        ],
+      ),
+    );
+  }
+}

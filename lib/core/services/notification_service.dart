@@ -1,0 +1,82 @@
+import 'package:supabase_flutter/supabase_flutter.dart';
+
+import '../models/app_notification.dart';
+
+class NotificationService {
+  final SupabaseClient _client;
+
+  NotificationService(this._client);
+
+  Future<List<AppNotification>> fetchNotifications(String userId) async {
+    final data = await _client
+        .from('notifications')
+        .select()
+        .eq('recipient_id', userId)
+        .order('created_at', ascending: false)
+        .limit(50);
+
+    final notifications = data as List;
+    if (notifications.isEmpty) return [];
+
+    final actorIds = notifications
+        .map((e) => e['actor_id'] as String)
+        .toSet()
+        .toList();
+
+    final profiles = await _client
+        .from('profiles')
+        .select('id, username, full_name, avatar_url')
+        .inFilter('id', actorIds);
+
+    final profileMap = {
+      for (final p in profiles as List) p['id'] as String: p as Map<String, dynamic>
+    };
+
+    return notifications.map((e) {
+      final actor = profileMap[e['actor_id'] as String];
+      return AppNotification.fromJson({...e, 'actor': actor});
+    }).toList();
+  }
+
+  Future<void> markAllRead(String userId) async {
+    await _client
+        .from('notifications')
+        .update({'is_read': true})
+        .eq('recipient_id', userId)
+        .eq('is_read', false);
+  }
+
+  /// Creates a follow notification, replacing any existing one from the same
+  /// actor so re-follow doesn't produce duplicate entries.
+  Future<void> createFollowNotification({
+    required String recipientId,
+    required String actorId,
+  }) async {
+    // Delete stale notification first (follow → unfollow → follow again)
+    await _client
+        .from('notifications')
+        .delete()
+        .eq('recipient_id', recipientId)
+        .eq('actor_id', actorId)
+        .eq('type', 'follow');
+
+    await _client.from('notifications').insert({
+      'recipient_id': recipientId,
+      'actor_id': actorId,
+      'type': 'follow',
+      'entity_type': 'profile',
+    });
+  }
+
+  Future<void> deleteFollowNotification({
+    required String recipientId,
+    required String actorId,
+  }) async {
+    await _client
+        .from('notifications')
+        .delete()
+        .eq('recipient_id', recipientId)
+        .eq('actor_id', actorId)
+        .eq('type', 'follow');
+  }
+}
