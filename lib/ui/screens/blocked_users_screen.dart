@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../core/app_theme.dart';
 import '../../core/providers/auth_providers.dart';
 import '../../core/providers/block_providers.dart';
 import '../../core/providers/explore_providers.dart';
@@ -19,7 +20,7 @@ class BlockedUsersScreen extends ConsumerWidget {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final blockedAsync = ref.watch(blockedUsersProvider);
 
-    final bg = isDark ? const Color(0xFF0F0F17) : const Color(0xFFF2F4F8);
+    final bg = isDark ? AppColors.darkScaffold : AppColors.lightScaffold;
     final tileBg = isDark ? Colors.white.withValues(alpha: 0.05) : Colors.white;
     final tileBorder = isDark
         ? Colors.white.withValues(alpha: 0.07)
@@ -224,7 +225,7 @@ class BlockedUsersScreen extends ConsumerWidget {
                                 borderRadius: BorderRadius.circular(14),
                               ),
                               color: isDark
-                                  ? const Color(0xFF1E1E28)
+                                  ? AppColors.darkSurface
                                   : Colors.white,
                               elevation: 6,
                               onSelected: (value) {

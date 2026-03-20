@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../core/app_theme.dart';
 import '../../core/providers/auth_providers.dart';
 import '../../core/services/profile_service.dart';
 import '../../core/theme_provider.dart';
@@ -15,7 +16,7 @@ class ThemeSelectorScreen extends ConsumerWidget {
     final current = ref.watch(appColorSchemeProvider);
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
-    final bg = isDark ? const Color(0xFF0F0F17) : const Color(0xFFF2F4F8);
+    final bg = isDark ? AppColors.darkScaffold : AppColors.lightScaffold;
 
     return Scaffold(
       backgroundColor: bg,

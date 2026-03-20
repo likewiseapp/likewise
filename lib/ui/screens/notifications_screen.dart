@@ -12,6 +12,7 @@ import '../../core/providers/notification_providers.dart';
 import '../../core/providers/profile_providers.dart';
 import '../../core/services/follow_service.dart';
 import '../../core/services/notification_service.dart';
+import '../../core/app_theme.dart';
 import '../../core/theme_provider.dart';
 import '../widgets/app_cached_image.dart';
 
@@ -390,12 +391,12 @@ class _NotifTileState extends ConsumerState<_NotifTile> {
       };
 
   Color get _typeColor => switch (widget.notif.type) {
-        'follow' => widget.colors.primary,
-        'like' => const Color(0xFFFF4757),
+        'follow'  => widget.colors.primary,
+        'like'    => AppColors.notifLike,
         'comment' => widget.colors.accent,
-        'mention' => const Color(0xFF0095FF),
-        'twin' => const Color(0xFF00B894),
-        _ => widget.colors.primary,
+        'mention' => AppColors.notifMention,
+        'twin'    => AppColors.notifTwin,
+        _         => widget.colors.primary,
       };
 
   String get _typeText => switch (widget.notif.type) {

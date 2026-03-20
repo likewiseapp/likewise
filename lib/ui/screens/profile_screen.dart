@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'dart:math' as math;
 
+import '../../core/app_theme.dart';
 import '../../core/models/hobby.dart';
 import '../../core/providers/auth_providers.dart';
 import '../../core/providers/hobby_providers.dart';
@@ -45,8 +46,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     if (userId == null) {
       return Scaffold(
         backgroundColor: isDark
-            ? const Color(0xFF0F0F17)
-            : const Color(0xFFF2F4F8),
+            ? AppColors.darkScaffold
+            : AppColors.lightScaffold,
         body: const Center(child: CircularProgressIndicator()),
       );
     }
@@ -57,8 +58,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
 
     return Scaffold(
       backgroundColor: isDark
-          ? const Color(0xFF0F0F17)
-          : const Color(0xFFF2F4F8),
+          ? AppColors.darkScaffold
+          : AppColors.lightScaffold,
       body: profileAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (e, _) {
@@ -307,7 +308,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                     child: Padding(
                       padding: const EdgeInsets.fromLTRB(24, 8, 24, 0),
                       child: _buildStickerWall(
-                          context, isDark, hobbyEntries, allHobbies),
+                          context, colors, isDark, hobbyEntries, allHobbies),
                     ),
                   ),
                 ],
@@ -505,6 +506,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
 
   Widget _buildStickerWall(
     BuildContext context,
+    AppColorScheme colors,
     bool isDark,
     List<({String name, bool isPrimary})> hobbyEntries,
     List<Hobby> allHobbies,
@@ -517,7 +519,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
       children: hobbyEntries.map((entry) {
         final hobby =
             allHobbies.where((h) => h.name == entry.name).firstOrNull;
-        final color = hobby?.colorValue ?? const Color(0xFF6C63FF);
+        final color = hobby?.colorValue ?? colors.primary;
         final icon = hobby?.icon ?? '✨';
         final rotation = (random.nextDouble() - 0.5) * 0.1;
 
@@ -531,7 +533,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
             decoration: BoxDecoration(
               color: entry.isPrimary
                   ? color.withValues(alpha: isDark ? 0.25 : 0.12)
-                  : (isDark ? const Color(0xFF1E1E28) : Colors.white),
+                  : (isDark ? AppColors.darkSurface : Colors.white),
               borderRadius: BorderRadius.circular(12),
               border: Border.all(
                 color: color.withValues(

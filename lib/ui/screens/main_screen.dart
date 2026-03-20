@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/app_theme.dart';
+import '../../core/providers/navigation_providers.dart';
 import '../../core/theme_provider.dart';
 import 'explore_screen.dart';
 import 'search_screen.dart';
@@ -15,8 +17,6 @@ class MainScreen extends ConsumerStatefulWidget {
 }
 
 class _MainScreenState extends ConsumerState<MainScreen> {
-  int _currentIndex = 0;
-
   final List<Widget> _screens = [
     const ExploreScreen(),
     const ReelsScreen(),
@@ -29,13 +29,14 @@ class _MainScreenState extends ConsumerState<MainScreen> {
     final colors = ref.watch(appColorSchemeProvider);
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final bottomPadding = MediaQuery.of(context).padding.bottom;
+    final currentIndex = ref.watch(selectedTabProvider);
 
-    final isReels = _currentIndex == 1;
+    final isReels = currentIndex == 1;
 
     return Scaffold(
       body: Stack(
         children: [
-          IndexedStack(index: _currentIndex, children: _screens),
+          IndexedStack(index: currentIndex, children: _screens),
 
           // ── One unified bottom bar ─────────────────────────────────
           AnimatedPositioned(
@@ -50,7 +51,7 @@ class _MainScreenState extends ConsumerState<MainScreen> {
               height: isReels ? 64 + bottomPadding : 64,
               padding: EdgeInsets.only(bottom: isReels ? bottomPadding : 0),
               decoration: BoxDecoration(
-                color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+                color: isDark ? AppColors.darkSurface : Colors.white,
                 borderRadius: BorderRadius.circular(isReels ? 0 : 32),
                 boxShadow: [
                   BoxShadow(
@@ -134,10 +135,10 @@ class _MainScreenState extends ConsumerState<MainScreen> {
     IconData selectedIcon,
     IconData unselectedIcon,
   ) {
-    final isSelected = _currentIndex == index;
+    final isSelected = ref.watch(selectedTabProvider) == index;
 
     return GestureDetector(
-      onTap: () => setState(() => _currentIndex = index),
+      onTap: () => ref.read(selectedTabProvider.notifier).setTab(index),
       behavior: HitTestBehavior.opaque,
       child: SizedBox(
         height: 52,

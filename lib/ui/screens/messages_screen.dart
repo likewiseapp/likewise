@@ -9,6 +9,7 @@ import '../../core/providers/auth_providers.dart';
 import '../../core/providers/block_providers.dart';
 import '../../core/providers/message_providers.dart';
 import '../../core/services/message_service.dart';
+import '../../core/app_theme.dart';
 import '../../core/theme_provider.dart';
 import '../widgets/app_cached_image.dart';
 
@@ -38,7 +39,7 @@ class _MessagesScreenState extends ConsumerState<MessagesScreen> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        backgroundColor: isDark ? const Color(0xFF1C1C2E) : Colors.white,
+        backgroundColor: isDark ? AppColors.darkSurface : Colors.white,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: Text(
           'Delete ${count == 1 ? 'Conversation' : 'Conversations'}',
@@ -832,9 +833,7 @@ class _ConversationTile extends StatelessWidget {
                         color: colors.primary,
                         shape: BoxShape.circle,
                         border: Border.all(
-                          color: isDark
-                              ? const Color(0xFF0F0F17)
-                              : const Color(0xFFF8F9FA),
+                          color: Theme.of(context).scaffoldBackgroundColor,
                           width: 2.5,
                         ),
                       ),

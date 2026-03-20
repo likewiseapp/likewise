@@ -8,6 +8,7 @@ import '../../core/providers/auth_providers.dart';
 import '../../core/providers/follow_providers.dart';
 import '../../core/providers/notification_providers.dart';
 import '../../core/providers/profile_providers.dart';
+import '../../core/app_theme.dart';
 import '../../core/services/follow_service.dart';
 import '../../core/services/notification_service.dart';
 import '../../core/theme_provider.dart';
@@ -67,7 +68,7 @@ class _FollowListScreenState extends ConsumerState<FollowListScreen>
   Widget build(BuildContext context) {
     final colors = ref.watch(appColorSchemeProvider);
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final bg = isDark ? const Color(0xFF0F0F17) : const Color(0xFFF2F4F8);
+    final bg = isDark ? AppColors.darkScaffold : AppColors.lightScaffold;
 
     final followersAsync = ref.watch(followersProvider(widget.userId));
     final followingAsync = ref.watch(followingProvider(widget.userId));

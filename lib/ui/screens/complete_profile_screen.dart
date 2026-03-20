@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/app_theme.dart';
 import '../../core/providers/auth_providers.dart';
 import '../../core/theme_provider.dart';
 
@@ -100,7 +101,7 @@ class _CompleteProfileScreenState extends ConsumerState<CompleteProfileScreen> {
 
     return Scaffold(
       backgroundColor:
-          isDark ? const Color(0xFF0F0F17) : const Color(0xFFF2F4F8),
+          isDark ? AppColors.darkScaffold : AppColors.lightScaffold,
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(

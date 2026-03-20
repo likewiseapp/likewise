@@ -7,6 +7,7 @@ import '../../core/providers/auth_providers.dart';
 import '../../core/providers/presence_providers.dart';
 import '../../core/providers/profile_providers.dart';
 import '../../core/services/profile_service.dart';
+import '../../core/app_theme.dart';
 import '../../core/theme_provider.dart';
 
 class SettingsScreen extends ConsumerWidget {
@@ -22,7 +23,7 @@ class SettingsScreen extends ConsumerWidget {
     final messagePermission = profile?.messagePermission ?? 'everyone';
     final profileVisibility = profile?.profileVisibility ?? 'public';
 
-    final bg = isDark ? const Color(0xFF0F0F17) : const Color(0xFFF5F5F7);
+    final bg = isDark ? AppColors.darkScaffold : AppColors.lightScaffoldAlt;
     final subtleText = isDark ? Colors.white38 : Colors.black38;
     final tileText = isDark ? Colors.white : Colors.black87;
     final iconColor = isDark ? Colors.white54 : Colors.black45;
@@ -140,7 +141,7 @@ class SettingsScreen extends ConsumerWidget {
                 label: 'Online Status',
                 subtitle: isOnline ? 'Visible to others' : 'Hidden',
                 iconColor: isOnline
-                    ? const Color(0xFF34C759)
+                    ? AppColors.onlineGreen
                     : (isDark ? Colors.white24 : Colors.black26),
                 textColor: tileText,
                 subtitleColor: subtleText,
@@ -511,7 +512,7 @@ Future<bool> _showConfirmDialog(
   return await showDialog<bool>(
         context: context,
         builder: (ctx) => AlertDialog(
-          backgroundColor: isDark ? const Color(0xFF1A1A2E) : Colors.white,
+          backgroundColor: isDark ? AppColors.darkSurface : Colors.white,
           shape:
               RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
           title: Text(
@@ -710,7 +711,7 @@ class _OptionSheetState extends State<_OptionSheet> {
 
   @override
   Widget build(BuildContext context) {
-    final bg = widget.isDark ? const Color(0xFF1A1A2E) : Colors.white;
+    final bg = widget.isDark ? AppColors.darkSurface : Colors.white;
     final divider = widget.isDark
         ? Colors.white.withValues(alpha: 0.06)
         : Colors.black.withValues(alpha: 0.06);

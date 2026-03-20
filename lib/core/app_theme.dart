@@ -1,6 +1,29 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+/// Canonical color constants used throughout the app.
+/// Always reference these instead of writing raw Color() literals.
+class AppColors {
+  // ── Scaffold backgrounds ────────────────────────────────────────────────
+  static const darkScaffold = Color(0xFF0F0F17);
+  static const lightScaffold = Color(0xFFF2F4F8);
+
+  // Settings screen uses a slightly different tint (iOS-style grouped bg)
+  static const lightScaffoldAlt = Color(0xFFF5F5F7);
+
+  // ── Surface / card / modal backgrounds ─────────────────────────────────
+  // Used for popups, bottom sheets, dialogs, cards in dark mode
+  static const darkSurface = Color(0xFF1E1E28);
+
+  // ── Semantic / functional colors ────────────────────────────────────────
+  static const onlineGreen = Color(0xFF34C759);
+
+  // ── Notification type indicator colors ──────────────────────────────────
+  static const notifLike    = Color(0xFFFF4757);
+  static const notifMention = Color(0xFF0095FF);
+  static const notifTwin    = Color(0xFF00B894);
+}
+
 class AppTheme {
   static final TextTheme textTheme = TextTheme(
     displayLarge: GoogleFonts.outfit(
@@ -51,7 +74,7 @@ class AppTheme {
       seedColor: seedColor,
       brightness: Brightness.light,
     ),
-    scaffoldBackgroundColor: const Color(0xFFF8F9FA),
+    scaffoldBackgroundColor: AppColors.lightScaffold,
     textTheme: textTheme,
     appBarTheme: const AppBarTheme(
       backgroundColor: Colors.transparent,
@@ -68,7 +91,7 @@ class AppTheme {
       seedColor: seedColor,
       brightness: Brightness.dark,
     ),
-    scaffoldBackgroundColor: const Color(0xFF0F0F17),
+    scaffoldBackgroundColor: AppColors.darkScaffold,
     textTheme: textTheme.apply(
       bodyColor: Colors.white,
       displayColor: Colors.white,

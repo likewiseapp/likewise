@@ -14,6 +14,7 @@ import '../../core/providers/block_providers.dart';
 import '../../core/providers/message_providers.dart';
 import '../../core/services/block_service.dart';
 import '../../core/services/message_service.dart';
+import '../../core/app_theme.dart';
 import '../../core/theme_provider.dart';
 
 class ChatScreen extends ConsumerStatefulWidget {
@@ -447,8 +448,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     final messageMap = {for (final m in allMessages) m.id: m};
 
     return Scaffold(
-      backgroundColor:
-          isDark ? const Color(0xFF0F0F17) : const Color(0xFFF8F9FA),
+      backgroundColor: isDark ? AppColors.darkScaffold : AppColors.lightScaffold,
       body: Column(
         children: [
           // ── Header ──────────────────────────────────────────────────
@@ -834,7 +834,7 @@ class _ChatHeader extends StatelessWidget {
                                 padding: const EdgeInsets.all(1.5),
                                 decoration: BoxDecoration(
                                   color: isDark
-                                      ? const Color(0xFF0F0F17)
+                                      ? AppColors.darkScaffold
                                       : Colors.white,
                                   shape: BoxShape.circle,
                                 ),
@@ -944,7 +944,7 @@ class _EmptyChat extends StatelessWidget {
             child: Container(
               padding: const EdgeInsets.all(2),
               decoration: BoxDecoration(
-                color: isDark ? const Color(0xFF0F0F17) : Colors.white,
+                color: isDark ? AppColors.darkScaffold : Colors.white,
                 shape: BoxShape.circle,
               ),
               child: ClipOval(
@@ -1262,7 +1262,7 @@ class _Bubble extends StatelessWidget {
                                   ? Colors.white
                                   : isDark
                                       ? Colors.white.withValues(alpha: 0.92)
-                                      : const Color(0xFF1A1A2E),
+                                      : AppColors.darkSurface,
                             ),
                           ),
                           // Inline timestamp + optional read indicator
@@ -1694,7 +1694,7 @@ class _MessageActionsSheet extends StatelessWidget {
     return Container(
           decoration: BoxDecoration(
             color: isDark
-                ? const Color(0xFF1A1A2E)
+                ? AppColors.darkSurface
                 : Colors.white,
             borderRadius:
                 const BorderRadius.vertical(top: Radius.circular(20)),

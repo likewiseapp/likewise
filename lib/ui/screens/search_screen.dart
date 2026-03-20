@@ -14,6 +14,7 @@ import '../../core/providers/notification_providers.dart';
 import '../../core/providers/profile_providers.dart';
 import '../../core/services/follow_service.dart';
 import '../../core/services/notification_service.dart';
+import '../../core/app_theme.dart';
 import '../../core/theme_provider.dart';
 import '../widgets/app_cached_image.dart';
 
@@ -1756,10 +1757,10 @@ class _FilterSheetState extends ConsumerState<_FilterSheet> {
             })
         .toList();
     final surfaceColor =
-        widget.isDark ? const Color(0xFF16161F) : const Color(0xFFF5F7FA);
+        widget.isDark ? AppColors.darkScaffold : AppColors.lightScaffold;
 
     return Scaffold(
-      backgroundColor: widget.isDark ? const Color(0xFF1A1A26) : Colors.white,
+      backgroundColor: widget.isDark ? AppColors.darkSurface : Colors.white,
       body: SafeArea(
         child: Column(
           children: [
@@ -2153,7 +2154,7 @@ class _FilterSheetState extends ConsumerState<_FilterSheet> {
               padding: const EdgeInsets.fromLTRB(24, 14, 24, 24),
               decoration: BoxDecoration(
                 color:
-                    widget.isDark ? const Color(0xFF1A1A26) : Colors.white,
+                    widget.isDark ? AppColors.darkSurface : Colors.white,
                 border: Border(
                   top: BorderSide(
                     color: widget.isDark
@@ -2248,7 +2249,7 @@ class _AllHobbiesDialogState extends State<_AllHobbiesDialog> {
                 .toLowerCase()
                 .contains(_query.toLowerCase()))
             .toList();
-    final bg = widget.isDark ? const Color(0xFF1A1A26) : Colors.white;
+    final bg = widget.isDark ? AppColors.darkSurface : Colors.white;
 
     return DraggableScrollableSheet(
       initialChildSize: 0.75,

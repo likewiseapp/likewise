@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import 'core/app_theme.dart';
 import 'core/providers/auth_providers.dart';
 import 'core/theme_provider.dart';
 import 'ui/screens/auth_screen.dart';
@@ -197,7 +198,7 @@ class _SplashScreen extends ConsumerWidget {
 
     return Scaffold(
       backgroundColor:
-          isDark ? const Color(0xFF0F0F17) : const Color(0xFFF2F4F8),
+          isDark ? AppColors.darkScaffold : AppColors.lightScaffold,
       body: Center(
         child: Column(
           mainAxisSize: MainAxisSize.min,

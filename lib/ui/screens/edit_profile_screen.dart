@@ -13,6 +13,7 @@ import '../../core/providers/auth_providers.dart';
 import '../../core/providers/hobby_providers.dart';
 import '../../core/providers/profile_providers.dart';
 import '../../core/services/profile_service.dart';
+import '../../core/app_theme.dart';
 import '../../core/theme_provider.dart';
 import '../widgets/app_cached_image.dart';
 
@@ -166,7 +167,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
       backgroundColor: Colors.transparent,
       builder: (context) => Container(
         decoration: BoxDecoration(
-          color: isDark ? const Color(0xFF1E1E28) : Colors.white,
+          color: isDark ? AppColors.darkSurface : Colors.white,
           borderRadius:
               const BorderRadius.vertical(top: Radius.circular(24)),
         ),
@@ -434,7 +435,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
       });
     }
 
-    final bgColor = isDark ? const Color(0xFF0F0F17) : const Color(0xFFF2F4F8);
+    final bgColor = isDark ? AppColors.darkScaffold : AppColors.lightScaffold;
 
     return Scaffold(
       backgroundColor: bgColor,
@@ -687,7 +688,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                     DropdownButtonFormField<String>(
                       value: _gender,
                       decoration: inputDeco,
-                      dropdownColor: isDark ? const Color(0xFF1E1E28) : Colors.white,
+                      dropdownColor: isDark ? AppColors.darkSurface : Colors.white,
                       style: _inputTextStyle(isDark),
                       isExpanded: true,
                       items: const [
@@ -837,7 +838,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
 
   // Background color helper for avatar border
   Color bgColor(bool isDark) =>
-      isDark ? const Color(0xFF0F0F17) : const Color(0xFFF2F4F8);
+      isDark ? AppColors.darkScaffold : AppColors.lightScaffold;
 
   Widget _label(String text, bool isDark) {
     return Text(
@@ -1035,7 +1036,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
             final categories = grouped.keys.toList()..sort();
 
             return Dialog(
-              backgroundColor: isDark ? const Color(0xFF1A1A24) : Colors.white,
+              backgroundColor: isDark ? AppColors.darkSurface : Colors.white,
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
               insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 40),
               child: Column(

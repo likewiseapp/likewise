@@ -18,6 +18,7 @@ import '../../core/services/follow_service.dart';
 import '../../core/services/message_service.dart';
 import '../../core/services/notification_service.dart';
 import '../../core/services/report_service.dart';
+import '../../core/app_theme.dart';
 import '../../core/theme_provider.dart';
 import '../widgets/app_cached_image.dart';
 
@@ -253,8 +254,7 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
         _isFollowingOverride ?? isFollowingAsync.value ?? false;
 
     return Scaffold(
-      backgroundColor:
-          isDark ? const Color(0xFF0F0F17) : const Color(0xFFF2F4F8),
+      backgroundColor: isDark ? AppColors.darkScaffold : AppColors.lightScaffold,
       body: profileAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (e, _) => const Center(child: Text('Something went wrong')),
@@ -297,7 +297,7 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
               SliverAppBar(
                 pinned: true,
                 backgroundColor:
-                    isDark ? const Color(0xFF0F0F17) : const Color(0xFFF2F4F8),
+                    isDark ? AppColors.darkScaffold : AppColors.lightScaffold,
                 elevation: 0,
                 automaticallyImplyLeading: false,
                 leading: Padding(
@@ -334,9 +334,7 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(16),
                         ),
-                        color: isDark
-                            ? const Color(0xFF1E1E28)
-                            : Colors.white,
+                        color: isDark ? AppColors.darkSurface : Colors.white,
                         elevation: 8,
                         onSelected: (value) {
                           if (value == 'block') {
@@ -436,8 +434,8 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
                             decoration: BoxDecoration(
                               shape: BoxShape.circle,
                               color: isDark
-                                  ? const Color(0xFF0F0F17)
-                                  : const Color(0xFFF2F4F8),
+                                  ? AppColors.darkScaffold
+                                  : AppColors.lightScaffold,
                             ),
                             child: AppCachedImage(
                               imageUrl: profile.avatarUrl,
@@ -686,7 +684,7 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
                   child: Padding(
                     padding: const EdgeInsets.fromLTRB(24, 8, 24, 0),
                     child: _buildStickerWall(
-                        context, isDark, hobbyNames, allHobbies),
+                        context, colors, isDark, hobbyNames, allHobbies),
                   ),
                 ),
               ],
@@ -896,6 +894,7 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
 
   Widget _buildStickerWall(
     BuildContext context,
+    AppColorScheme colors,
     bool isDark,
     List<String> hobbyNames,
     List<Hobby> allHobbies,
@@ -910,7 +909,7 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
       children: hobbyNames.map((hobbyName) {
         final hobby =
             allHobbies.where((h) => h.name == hobbyName).firstOrNull;
-        final color = hobby?.colorValue ?? const Color(0xFF6C63FF);
+        final color = hobby?.colorValue ?? colors.primary;
         final icon = hobby?.icon ?? '✨';
         final rotation = (random.nextDouble() - 0.5) * 0.1;
 
@@ -920,7 +919,7 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
             padding:
                 const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
             decoration: BoxDecoration(
-              color: isDark ? const Color(0xFF1E1E28) : Colors.white,
+              color: isDark ? AppColors.darkSurface : Colors.white,
               borderRadius: BorderRadius.circular(12),
               border: Border.all(
                   color: color.withValues(alpha: 0.3), width: 2),
@@ -1031,7 +1030,7 @@ class _ReportBottomSheetState extends State<_ReportBottomSheet> {
   Widget build(BuildContext context) {
     final isDark = widget.isDark;
     final colors = widget.colors;
-    final bg = isDark ? const Color(0xFF1A1A26) : Colors.white;
+    final bg = isDark ? AppColors.darkSurface : Colors.white;
     final textPrimary = isDark ? Colors.white : Colors.black87;
     final textSecondary = isDark ? Colors.white54 : Colors.black45;
     final dividerColor = isDark

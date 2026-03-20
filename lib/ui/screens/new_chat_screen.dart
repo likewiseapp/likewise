@@ -7,6 +7,7 @@ import 'package:go_router/go_router.dart';
 import '../../core/models/profile.dart';
 import '../../core/providers/auth_providers.dart';
 import '../../core/services/follow_service.dart';
+import '../../core/app_theme.dart';
 import '../../core/services/message_service.dart';
 import '../../core/theme_provider.dart';
 import '../widgets/app_cached_image.dart';
@@ -83,7 +84,7 @@ class _NewChatScreenState extends ConsumerState<NewChatScreen> {
 
     return Scaffold(
       backgroundColor:
-          isDark ? const Color(0xFF0F0F17) : const Color(0xFFF8F9FA),
+          isDark ? AppColors.darkScaffold : AppColors.lightScaffold,
       body: Stack(
         children: [
           CustomScrollView(
