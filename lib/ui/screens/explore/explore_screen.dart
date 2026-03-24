@@ -5,18 +5,18 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../core/models/profile_card_data.dart';
-import '../../core/app_theme.dart';
-import '../../core/providers/auth_providers.dart';
-import '../../core/providers/explore_providers.dart';
-import '../../core/providers/hobby_providers.dart';
-import '../../core/providers/message_providers.dart';
-import '../../core/providers/notification_providers.dart';
-import '../../core/providers/profile_providers.dart';
-import '../../core/theme_provider.dart';
-import '../widgets/app_cached_image.dart';
-import '../widgets/app_drawer.dart';
-import '../widgets/user_profile_card.dart';
+import '../../../core/models/profile_card_data.dart';
+import '../../../core/app_theme.dart';
+import '../../../core/providers/auth_providers.dart';
+import '../../../core/providers/explore_providers.dart';
+import '../../../core/providers/hobby_providers.dart';
+import '../../../core/providers/message_providers.dart';
+import '../../../core/providers/notification_providers.dart';
+import '../../../core/providers/profile_providers.dart';
+import '../../../core/theme_provider.dart';
+import '../../widgets/app_cached_image.dart';
+import '../../widgets/app_drawer.dart';
+import '../../widgets/user_profile_card.dart';
 
 class ExploreScreen extends ConsumerStatefulWidget {
   const ExploreScreen({super.key});

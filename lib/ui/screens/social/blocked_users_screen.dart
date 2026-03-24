@@ -3,13 +3,13 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../core/app_theme.dart';
-import '../../core/providers/auth_providers.dart';
-import '../../core/providers/block_providers.dart';
-import '../../core/providers/explore_providers.dart';
-import '../../core/services/block_service.dart';
-import '../../core/theme_provider.dart';
-import '../widgets/app_cached_image.dart';
+import '../../../core/app_theme.dart';
+import '../../../core/providers/auth_providers.dart';
+import '../../../core/providers/block_providers.dart';
+import '../../../core/providers/explore_providers.dart';
+import '../../../core/services/block_service.dart';
+import '../../../core/theme_provider.dart';
+import '../../widgets/app_cached_image.dart';
 
 class BlockedUsersScreen extends ConsumerWidget {
   const BlockedUsersScreen({super.key});

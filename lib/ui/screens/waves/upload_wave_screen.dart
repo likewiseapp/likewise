@@ -6,8 +6,8 @@ import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:pro_video_editor/pro_video_editor.dart';
 
-import '../../core/models/wave_edit_state.dart';
-import '../../core/theme_provider.dart';
+import '../../../core/models/wave_edit_state.dart';
+import '../../../core/theme_provider.dart';
 
 class UploadWaveScreen extends ConsumerStatefulWidget {
   const UploadWaveScreen({super.key});

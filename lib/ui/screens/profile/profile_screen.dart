@@ -4,13 +4,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'dart:math' as math;
 
-import '../../core/app_theme.dart';
-import '../../core/models/hobby.dart';
-import '../../core/providers/auth_providers.dart';
-import '../../core/providers/hobby_providers.dart';
-import '../../core/providers/profile_providers.dart';
-import '../../core/theme_provider.dart';
-import '../widgets/app_cached_image.dart';
+import '../../../core/app_theme.dart';
+import '../../../core/models/hobby.dart';
+import '../../../core/providers/auth_providers.dart';
+import '../../../core/providers/hobby_providers.dart';
+import '../../../core/providers/profile_providers.dart';
+import '../../../core/theme_provider.dart';
+import '../../widgets/app_cached_image.dart';
 
 class ProfileScreen extends ConsumerStatefulWidget {
   const ProfileScreen({super.key});

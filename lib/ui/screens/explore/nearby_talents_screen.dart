@@ -3,11 +3,11 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../core/models/profile_card_data.dart';
-import '../../core/providers/explore_providers.dart';
-import '../../core/providers/hobby_providers.dart';
-import '../../core/theme_provider.dart';
-import '../widgets/user_profile_card.dart';
+import '../../../core/models/profile_card_data.dart';
+import '../../../core/providers/explore_providers.dart';
+import '../../../core/providers/hobby_providers.dart';
+import '../../../core/theme_provider.dart';
+import '../../widgets/user_profile_card.dart';
 
 class NearbyTalentsScreen extends ConsumerWidget {
   const NearbyTalentsScreen({super.key});

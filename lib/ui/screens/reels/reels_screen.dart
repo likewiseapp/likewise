@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../core/constants.dart';
-import '../../core/theme_provider.dart';
-import '../widgets/app_cached_image.dart';
+import '../../../core/constants.dart';
+import '../../../core/theme_provider.dart';
+import '../../widgets/app_cached_image.dart';
 
 class ReelsScreen extends ConsumerStatefulWidget {
   const ReelsScreen({super.key});

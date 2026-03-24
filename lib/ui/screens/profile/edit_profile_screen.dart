@@ -8,14 +8,14 @@ import 'package:geolocator/geolocator.dart';
 import 'package:geocoding/geocoding.dart';
 import 'package:image_picker/image_picker.dart';
 
-import '../../core/models/hobby.dart';
-import '../../core/providers/auth_providers.dart';
-import '../../core/providers/hobby_providers.dart';
-import '../../core/providers/profile_providers.dart';
-import '../../core/services/profile_service.dart';
-import '../../core/app_theme.dart';
-import '../../core/theme_provider.dart';
-import '../widgets/app_cached_image.dart';
+import '../../../core/models/hobby.dart';
+import '../../../core/providers/auth_providers.dart';
+import '../../../core/providers/hobby_providers.dart';
+import '../../../core/providers/profile_providers.dart';
+import '../../../core/services/profile_service.dart';
+import '../../../core/app_theme.dart';
+import '../../../core/theme_provider.dart';
+import '../../widgets/app_cached_image.dart';
 
 class EditProfileScreen extends ConsumerStatefulWidget {
   const EditProfileScreen({super.key});

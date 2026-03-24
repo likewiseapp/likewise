@@ -4,17 +4,17 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../core/models/app_notification.dart';
-import '../../core/providers/auth_providers.dart';
-import '../../core/providers/block_providers.dart';
-import '../../core/providers/follow_providers.dart';
-import '../../core/providers/notification_providers.dart';
-import '../../core/providers/profile_providers.dart';
-import '../../core/services/follow_service.dart';
-import '../../core/services/notification_service.dart';
-import '../../core/app_theme.dart';
-import '../../core/theme_provider.dart';
-import '../widgets/app_cached_image.dart';
+import '../../../core/models/app_notification.dart';
+import '../../../core/providers/auth_providers.dart';
+import '../../../core/providers/block_providers.dart';
+import '../../../core/providers/follow_providers.dart';
+import '../../../core/providers/notification_providers.dart';
+import '../../../core/providers/profile_providers.dart';
+import '../../../core/services/follow_service.dart';
+import '../../../core/services/notification_service.dart';
+import '../../../core/app_theme.dart';
+import '../../../core/theme_provider.dart';
+import '../../widgets/app_cached_image.dart';
 
 class NotificationsScreen extends ConsumerStatefulWidget {
   const NotificationsScreen({super.key});

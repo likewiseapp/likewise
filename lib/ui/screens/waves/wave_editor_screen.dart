@@ -7,8 +7,8 @@ import 'package:go_router/go_router.dart';
 import 'package:pro_video_editor/pro_video_editor.dart';
 import 'package:video_player/video_player.dart';
 
-import '../../core/models/wave_edit_state.dart';
-import '../../core/theme_provider.dart';
+import '../../../core/models/wave_edit_state.dart';
+import '../../../core/theme_provider.dart';
 
 class WaveEditorScreen extends ConsumerStatefulWidget {
   final WaveEditState initialState;

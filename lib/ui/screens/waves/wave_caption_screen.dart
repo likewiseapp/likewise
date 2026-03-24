@@ -7,9 +7,9 @@ import 'package:path_provider/path_provider.dart';
 import 'package:pro_video_editor/pro_video_editor.dart';
 import 'package:video_player/video_player.dart';
 
-import '../../core/models/wave_edit_state.dart';
-import '../../core/providers/wave_providers.dart';
-import '../../core/theme_provider.dart';
+import '../../../core/models/wave_edit_state.dart';
+import '../../../core/providers/wave_providers.dart';
+import '../../../core/theme_provider.dart';
 
 class WaveCaptionScreen extends ConsumerStatefulWidget {
   final WaveEditState editState;

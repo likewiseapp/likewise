@@ -2,11 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:video_player/video_player.dart';
 
-import '../../core/models/wave.dart';
-import '../../core/providers/navigation_providers.dart';
-import '../../core/providers/wave_providers.dart';
-import '../../core/theme_provider.dart';
-import '../widgets/app_cached_image.dart';
+import '../../../core/models/wave.dart';
+import '../../../core/providers/navigation_providers.dart';
+import '../../../core/providers/wave_providers.dart';
+import '../../../core/theme_provider.dart';
+import '../../widgets/app_cached_image.dart';
 
 class WavesScreen extends ConsumerStatefulWidget {
   const WavesScreen({super.key});

@@ -3,9 +3,9 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../core/app_theme.dart';
-import '../../core/providers/auth_providers.dart';
-import '../../core/theme_provider.dart';
+import '../../../core/app_theme.dart';
+import '../../../core/providers/auth_providers.dart';
+import '../../../core/theme_provider.dart';
 
 class CompleteProfileScreen extends ConsumerStatefulWidget {
   const CompleteProfileScreen({super.key});

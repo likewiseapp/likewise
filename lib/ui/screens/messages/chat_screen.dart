@@ -6,16 +6,16 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-import '../widgets/app_cached_image.dart';
-import '../../core/models/message.dart';
-import '../../core/models/message_reaction.dart';
-import '../../core/providers/auth_providers.dart';
-import '../../core/providers/block_providers.dart';
-import '../../core/providers/message_providers.dart';
-import '../../core/services/block_service.dart';
-import '../../core/services/message_service.dart';
-import '../../core/app_theme.dart';
-import '../../core/theme_provider.dart';
+import '../../widgets/app_cached_image.dart';
+import '../../../core/models/message.dart';
+import '../../../core/models/message_reaction.dart';
+import '../../../core/providers/auth_providers.dart';
+import '../../../core/providers/block_providers.dart';
+import '../../../core/providers/message_providers.dart';
+import '../../../core/services/block_service.dart';
+import '../../../core/services/message_service.dart';
+import '../../../core/app_theme.dart';
+import '../../../core/theme_provider.dart';
 
 class ChatScreen extends ConsumerStatefulWidget {
   final String conversationId;

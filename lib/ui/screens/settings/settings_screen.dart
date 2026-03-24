@@ -3,12 +3,12 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../core/providers/auth_providers.dart';
-import '../../core/providers/presence_providers.dart';
-import '../../core/providers/profile_providers.dart';
-import '../../core/services/profile_service.dart';
-import '../../core/app_theme.dart';
-import '../../core/theme_provider.dart';
+import '../../../core/providers/auth_providers.dart';
+import '../../../core/providers/presence_providers.dart';
+import '../../../core/providers/profile_providers.dart';
+import '../../../core/services/profile_service.dart';
+import '../../../core/app_theme.dart';
+import '../../../core/theme_provider.dart';
 
 class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});

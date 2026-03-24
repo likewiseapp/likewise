@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../core/theme_provider.dart';
+import '../../../core/theme_provider.dart';
 
 class LikesScreen extends ConsumerWidget {
   const LikesScreen({super.key});

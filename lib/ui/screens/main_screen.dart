@@ -7,10 +7,10 @@ import '../../core/app_theme.dart';
 import '../../core/providers/navigation_providers.dart';
 import '../../core/providers/wave_providers.dart';
 import '../../core/theme_provider.dart';
-import 'explore_screen.dart';
-import 'search_screen.dart';
-import 'profile_screen.dart';
-import 'waves_screen.dart';
+import 'explore/explore_screen.dart';
+import 'explore/search_screen.dart';
+import 'profile/profile_screen.dart';
+import 'waves/waves_screen.dart';
 
 class MainScreen extends ConsumerStatefulWidget {
   const MainScreen({super.key});

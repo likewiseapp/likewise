@@ -4,12 +4,12 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../core/models/conversation.dart';
-import '../../core/providers/auth_providers.dart';
-import '../../core/providers/message_providers.dart';
-import '../../core/app_theme.dart';
-import '../../core/theme_provider.dart';
-import '../widgets/app_cached_image.dart';
+import '../../../core/models/conversation.dart';
+import '../../../core/providers/auth_providers.dart';
+import '../../../core/providers/message_providers.dart';
+import '../../../core/app_theme.dart';
+import '../../../core/theme_provider.dart';
+import '../../widgets/app_cached_image.dart';
 
 class MessageRequestsScreen extends ConsumerWidget {
   const MessageRequestsScreen({super.key});
