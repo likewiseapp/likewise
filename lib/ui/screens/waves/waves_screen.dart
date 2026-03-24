@@ -7,6 +7,7 @@ import '../../../core/providers/navigation_providers.dart';
 import '../../../core/providers/wave_providers.dart';
 import '../../../core/theme_provider.dart';
 import '../../widgets/app_cached_image.dart';
+import 'wave_player_manager.dart';
 
 class WavesScreen extends ConsumerStatefulWidget {
   const WavesScreen({super.key});
@@ -17,120 +18,49 @@ class WavesScreen extends ConsumerStatefulWidget {
 
 class _WavesScreenState extends ConsumerState<WavesScreen> {
   final PageController _pageController = PageController();
-  int _currentIndex = 0;
-  bool _firstVideoReady = false;
+  late final WavePlayerManager _player;
 
-  // Controllers keyed by wave list index
-  final Map<int, VideoPlayerController> _controllers = {};
-  List<Wave> _waves = [];
+  @override
+  void initState() {
+    super.initState();
+    _player = WavePlayerManager(
+      isMounted: () => mounted,
+      setState: setState,
+    );
+  }
 
   @override
   void dispose() {
+    _player.dispose();
     _pageController.dispose();
-    for (final c in _controllers.values) {
-      c.dispose();
-    }
     super.dispose();
-  }
-
-  Future<void> _initController(int index) async {
-    if (index < 0 || index >= _waves.length) return;
-    if (_controllers.containsKey(index)) return;
-
-    final controller = VideoPlayerController.networkUrl(
-      Uri.parse(_waves[index].videoUrl),
-    );
-    _controllers[index] = controller;
-
-    try {
-      await controller.initialize();
-      controller.setLooping(true);
-      if (mounted) {
-        setState(() {
-          if (index == 0) _firstVideoReady = true;
-        });
-      }
-      // Only play if this became the active index by the time init finishes
-      if (index == _currentIndex && _isTabActive && mounted) {
-        controller.play();
-      }
-    } catch (_) {
-      // Mark ready even on error so we don't get stuck on the loading screen
-      if (index == 0 && mounted) setState(() => _firstVideoReady = true);
-    }
-  }
-
-  bool get _isTabActive => ref.read(selectedTabProvider) == 1;
-
-  void _onPageChanged(int index) {
-    // Pause the outgoing video
-    _controllers[_currentIndex]?.pause();
-
-    setState(() => _currentIndex = index);
-
-    // Play the incoming video if already initialized
-    final current = _controllers[index];
-    if (current != null && current.value.isInitialized && _isTabActive) {
-      current.play();
-    }
-
-    // Pre-load next
-    _initController(index + 1);
-
-    // Dispose controllers that are 2+ pages away to free memory
-    final toRemove = _controllers.keys
-        .where((k) => (k - index).abs() > 1)
-        .toList();
-    for (final k in toRemove) {
-      _controllers[k]?.dispose();
-      _controllers.remove(k);
-    }
   }
 
   void _onTabActiveChanged(bool isActive) {
     if (isActive) {
-      _reset();
+      _player.reset();
+      setState(() {});
+      if (_pageController.hasClients) _pageController.jumpToPage(0);
+      ref.invalidate(wavesProvider);
     } else {
-      _controllers[_currentIndex]?.pause();
+      _player.deactivate();
     }
-  }
-
-  void _reset() {
-    // Dispose all controllers and reset state, then re-fetch
-    for (final c in _controllers.values) {
-      c.dispose();
-    }
-    _controllers.clear();
-    setState(() {
-      _currentIndex = 0;
-      _firstVideoReady = false;
-      _waves = [];
-    });
-    if (_pageController.hasClients) _pageController.jumpToPage(0);
-    ref.invalidate(wavesProvider);
-
-    // Cap the loading screen at 2 seconds
-    Future.delayed(const Duration(seconds: 2), () {
-      if (mounted && !_firstVideoReady) {
-        setState(() => _firstVideoReady = true);
-      }
-    });
   }
 
   @override
   Widget build(BuildContext context) {
     final wavesAsync = ref.watch(wavesProvider);
     final isTabActive = ref.watch(selectedTabProvider) == 1;
+    _player.isTabActive = isTabActive;
 
-    // React to tab switches without a page change
     ref.listen(selectedTabProvider, (_, next) => _onTabActiveChanged(next == 1));
+
+    final colors = ref.watch(appColorSchemeProvider);
 
     return Scaffold(
       backgroundColor: Colors.black,
       body: wavesAsync.when(
-        loading: () => const Center(
-          child: CircularProgressIndicator(color: Colors.white),
-        ),
+        loading: () => _WavesLoadingScreen(colors: colors),
         error: (e, _) => Center(
           child: Text(
             'Failed to load waves\n$e',
@@ -157,32 +87,29 @@ class _WavesScreenState extends ConsumerState<WavesScreen> {
             );
           }
 
-          // Seed the wave list and kick off the first two controllers
-          if (_waves != waves) {
-            _waves = waves;
-            _firstVideoReady = false;
-            _initController(0);
-            _initController(1);
+          if (_player.setWaves(waves) && isTabActive) {
+            _player.firstVideoReady = false;
+            _player.loadAndPlay(0);
           }
 
-          if (!_firstVideoReady) {
-            return _WavesLoadingScreen(colors: ref.watch(appColorSchemeProvider));
+          if (!_player.firstVideoReady) {
+            return _WavesLoadingScreen(colors: colors);
           }
 
           return PageView.builder(
             controller: _pageController,
             scrollDirection: Axis.vertical,
             itemCount: waves.length,
-            onPageChanged: _onPageChanged,
+            onPageChanged: _player.onPageChanged,
             itemBuilder: (context, index) => _WaveItem(
               wave: waves[index],
-              controller: _controllers[index],
-              isActive: index == _currentIndex && isTabActive,
+              controller: _player.controllers[index],
+              isActive: index == _player.currentIndex && isTabActive,
               onTogglePlayPause: () {
-                final c = _controllers[index];
-                if (c == null || !c.value.isInitialized) return;
+                final ctrl = _player.controllers[index];
+                if (ctrl == null || !ctrl.value.isInitialized) return;
                 setState(() {
-                  c.value.isPlaying ? c.pause() : c.play();
+                  ctrl.value.isPlaying ? ctrl.pause() : ctrl.play();
                 });
               },
             ),
@@ -356,7 +283,7 @@ class _WaveItemState extends ConsumerState<_WaveItem> {
           ),
 
           // ── Loading indicator (controller exists but not yet ready) ────
-          if (ctrl != null && !isReady)
+          if (widget.controller != null && !isReady)
             const Center(
               child: CircularProgressIndicator(
                 color: Colors.white54,
