@@ -170,3 +170,15 @@ CREATE TABLE public.user_presence (
   CONSTRAINT user_presence_pkey PRIMARY KEY (user_id),
   CONSTRAINT user_presence_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id)
 );
+CREATE TABLE public.waves (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  user_id uuid NOT NULL,
+  video_id text NOT NULL,
+  video_url text NOT NULL,
+  thumbnail_url text NOT NULL,
+  caption text DEFAULT ''::text,
+  status text NOT NULL DEFAULT 'pending'::text CHECK (status = ANY (ARRAY['pending'::text, 'approved'::text, 'rejected'::text])),
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  CONSTRAINT waves_pkey PRIMARY KEY (id),
+  CONSTRAINT waves_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE
+);

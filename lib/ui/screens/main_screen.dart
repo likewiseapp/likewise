@@ -1,13 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'package:go_router/go_router.dart';
+
 import '../../core/app_theme.dart';
 import '../../core/providers/navigation_providers.dart';
+import '../../core/providers/wave_providers.dart';
 import '../../core/theme_provider.dart';
 import 'explore_screen.dart';
 import 'search_screen.dart';
 import 'profile_screen.dart';
-import 'reels_screen.dart';
+import 'waves_screen.dart';
 
 class MainScreen extends ConsumerStatefulWidget {
   const MainScreen({super.key});
@@ -19,10 +22,13 @@ class MainScreen extends ConsumerStatefulWidget {
 class _MainScreenState extends ConsumerState<MainScreen> {
   final List<Widget> _screens = [
     const ExploreScreen(),
-    const ReelsScreen(),
+    const WavesScreen(),
     const SearchScreen(),
     const ProfileScreen(),
   ];
+
+  bool _showSuccessBanner = false;
+  String? _uploadError;
 
   @override
   Widget build(BuildContext context) {
@@ -33,10 +39,31 @@ class _MainScreenState extends ConsumerState<MainScreen> {
 
     final isReels = currentIndex == 1;
 
+    ref.listen<AsyncValue<void>>(waveUploadProvider, (prev, next) {
+      if (prev is AsyncLoading && next is AsyncData) {
+        ref.invalidate(wavesProvider);
+        setState(() {
+          _showSuccessBanner = true;
+          _uploadError = null;
+        });
+        Future.delayed(const Duration(seconds: 3), () {
+          if (mounted) setState(() => _showSuccessBanner = false);
+        });
+      } else if (prev is AsyncLoading && next is AsyncError) {
+        setState(() {
+          _uploadError = 'Upload failed. Please try again.';
+          _showSuccessBanner = false;
+        });
+      }
+    });
+
     return Scaffold(
       body: Stack(
         children: [
           IndexedStack(index: currentIndex, children: _screens),
+
+          // ── Upload progress banner ────────────────────────────────
+          _buildUploadBanner(colors),
 
           // ── One unified bottom bar ─────────────────────────────────
           AnimatedPositioned(
@@ -91,9 +118,7 @@ class _MainScreenState extends ConsumerState<MainScreen> {
                   Padding(
                     padding: const EdgeInsets.only(right: 8),
                     child: GestureDetector(
-                      onTap: () {
-                        // TODO: Handle add action
-                      },
+                      onTap: () => context.push('/upload-wave'),
                       child: Container(
                         width: 46,
                         height: 46,
@@ -125,6 +150,115 @@ class _MainScreenState extends ConsumerState<MainScreen> {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildUploadBanner(AppColorScheme colors) {
+    final uploadState = ref.watch(waveUploadProvider);
+    final progress = ref.watch(uploadProgressProvider);
+    final isUploading = uploadState is AsyncLoading;
+
+    final visible = isUploading || _showSuccessBanner || _uploadError != null;
+    if (!visible) return const SizedBox.shrink();
+
+    final isSuccess = _showSuccessBanner;
+    final isError = _uploadError != null;
+
+    return Positioned(
+      left: 16,
+      right: 16,
+      bottom: 104,
+      child: AnimatedOpacity(
+        opacity: visible ? 1.0 : 0.0,
+        duration: const Duration(milliseconds: 250),
+        child: Material(
+          elevation: 8,
+          borderRadius: BorderRadius.circular(16),
+          color: isError
+              ? const Color(0xFFB00020)
+              : isSuccess
+                  ? const Color(0xFF1B8C4E)
+                  : const Color(0xFF1E1E1E),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            child: isError
+                ? Row(
+                    children: [
+                      const Icon(Icons.error_outline_rounded,
+                          color: Colors.white, size: 20),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          _uploadError!,
+                          style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 13,
+                              fontWeight: FontWeight.w500),
+                        ),
+                      ),
+                      GestureDetector(
+                        onTap: () => setState(() => _uploadError = null),
+                        child: const Icon(Icons.close_rounded,
+                            color: Colors.white70, size: 18),
+                      ),
+                    ],
+                  )
+                : isSuccess
+                    ? const Row(
+                        children: [
+                          Icon(Icons.check_circle_rounded,
+                              color: Colors.white, size: 20),
+                          SizedBox(width: 10),
+                          Text(
+                            'Wave uploaded! It will be ready shortly.',
+                            style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 13,
+                                fontWeight: FontWeight.w500),
+                          ),
+                        ],
+                      )
+                    : Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Row(
+                            children: [
+                              const Icon(Icons.upload_rounded,
+                                  color: Colors.white70, size: 18),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  progress >= 1.0
+                                      ? 'Finalizing your Wave...'
+                                      : progress > 0
+                                          ? 'Uploading your Wave...  ${(progress * 100).toInt()}%'
+                                          : 'Uploading your Wave...',
+                                  style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w500),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(4),
+                            child: LinearProgressIndicator(
+                              value: (progress > 0 && progress < 1.0)
+                                  ? progress
+                                  : null,
+                              minHeight: 3,
+                              backgroundColor: Colors.white12,
+                              color: colors.primary,
+                            ),
+                          ),
+                        ],
+                      ),
+          ),
+        ),
       ),
     );
   }

@@ -25,6 +25,10 @@ import 'ui/screens/settings_screen.dart';
 import 'ui/screens/nearby_talents_screen.dart';
 import 'ui/screens/top_creators_screen.dart';
 import 'ui/screens/theme_selector_screen.dart';
+import 'ui/screens/upload_wave_screen.dart';
+import 'ui/screens/wave_editor_screen.dart';
+import 'ui/screens/wave_caption_screen.dart';
+import 'core/models/wave_edit_state.dart';
 
 // Notifies GoRouter whenever auth state or profile-exists state changes.
 class _AuthListenable extends ChangeNotifier {
@@ -169,6 +173,28 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/nearby-talents',
         builder: (context, state) => const NearbyTalentsScreen(),
+      ),
+      GoRoute(
+        path: '/upload-wave',
+        builder: (context, state) => const UploadWaveScreen(),
+      ),
+      GoRoute(
+        path: '/wave-editor',
+        redirect: (context, state) =>
+            state.extra is WaveEditState ? null : '/',
+        builder: (context, state) {
+          final editState = state.extra as WaveEditState;
+          return WaveEditorScreen(initialState: editState);
+        },
+      ),
+      GoRoute(
+        path: '/wave-caption',
+        redirect: (context, state) =>
+            state.extra is WaveEditState ? null : '/',
+        builder: (context, state) {
+          final editState = state.extra as WaveEditState;
+          return WaveCaptionScreen(editState: editState);
+        },
       ),
       GoRoute(
         path: '/follow-list/:id/:tab',
