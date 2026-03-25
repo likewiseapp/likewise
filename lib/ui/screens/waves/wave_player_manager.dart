@@ -1,5 +1,4 @@
-import 'dart:ui';
-
+import 'package:flutter/scheduler.dart';
 import 'package:video_player/video_player.dart';
 
 import '../../../core/models/wave.dart';
@@ -12,8 +11,13 @@ class WavePlayerManager {
   WavePlayerManager({
     required bool Function() isMounted,
     required void Function(VoidCallback fn) setState,
+    this.qualityUrlResolver,
   })  : _isMounted = isMounted,
         _setState = setState;
+
+  /// Optional resolver: given a master HLS URL returns the preferred quality
+  /// sub-playlist URL, or null to use the master URL (Auto / ABR).
+  final Future<String?> Function(String masterUrl)? qualityUrlResolver;
 
   final bool Function() _isMounted;
   final void Function(VoidCallback fn) _setState;
@@ -34,14 +38,20 @@ class WavePlayerManager {
     return true;
   }
 
+  Future<String> _resolveUrl(String masterUrl) async {
+    if (qualityUrlResolver == null) return masterUrl;
+    return await qualityUrlResolver!(masterUrl) ?? masterUrl;
+  }
+
   /// Initializes [index], plays it, then preloads the next video.
   Future<void> loadAndPlay(int index) async {
     if (index < 0 || index >= _waves.length) return;
 
     final gen = _loadGeneration;
+    final url = await _resolveUrl(_waves[index].videoUrl);
 
     final controller = VideoPlayerController.networkUrl(
-      Uri.parse(_waves[index].videoUrl),
+      Uri.parse(url),
     );
     // Replaces any stale preload — the old controller's guard will self-dispose.
     controllers[index] = controller;
@@ -97,9 +107,10 @@ class WavePlayerManager {
     if (controllers.containsKey(index)) return; // already loaded or loading
 
     final gen = _loadGeneration;
+    final url = await _resolveUrl(_waves[index].videoUrl);
 
     final controller = VideoPlayerController.networkUrl(
-      Uri.parse(_waves[index].videoUrl),
+      Uri.parse(url),
     );
     controllers[index] = controller;
 
@@ -164,6 +175,40 @@ class WavePlayerManager {
     currentIndex = 0;
     firstVideoReady = false;
     _waves = [];
+  }
+
+  /// Reinitializes the controller at [index] with a new [url] (quality switch).
+  Future<void> changeQuality(int index, String url) async {
+    if (index < 0 || index >= _waves.length) return;
+
+    // Pause immediately to kill audio, then pull from the map and trigger a
+    // rebuild. The VideoPlayer widget must fully unmount before dispose —
+    // use addPostFrameCallback to guarantee that.
+    final old = controllers[index];
+    old?.pause();
+    controllers.remove(index);
+    _setState(() {});
+    SchedulerBinding.instance.addPostFrameCallback((_) => old?.dispose());
+
+    final controller = VideoPlayerController.networkUrl(Uri.parse(url));
+    controllers[index] = controller;
+
+    try {
+      await controller.initialize();
+
+      if (!_isMounted() || controllers[index] != controller) {
+        controller.dispose();
+        return;
+      }
+
+      controller.setLooping(true);
+      if (index == currentIndex && isTabActive) controller.play();
+
+      _setState(() {});
+    } catch (_) {
+      if (controllers[index] == controller) controllers.remove(index);
+      controller.dispose();
+    }
   }
 
   /// Dispose all controllers and prevent future callbacks.

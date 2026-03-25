@@ -46,6 +46,7 @@ extension WaveFilterExt on WaveFilter {
 class WaveEditState {
   final String videoPath;
   final Duration videoDuration;
+  final Size videoResolution;
   final Duration trimStart;
   final Duration trimEnd;
   final WaveFilter filter;
@@ -53,6 +54,7 @@ class WaveEditState {
   const WaveEditState({
     required this.videoPath,
     required this.videoDuration,
+    required this.videoResolution,
     required this.trimStart,
     required this.trimEnd,
     this.filter = WaveFilter.none,
@@ -66,6 +68,7 @@ class WaveEditState {
       WaveEditState(
         videoPath: videoPath,
         videoDuration: videoDuration,
+        videoResolution: videoResolution,
         trimStart: trimStart ?? this.trimStart,
         trimEnd: trimEnd ?? this.trimEnd,
         filter: filter ?? this.filter,

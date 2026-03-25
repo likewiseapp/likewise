@@ -46,6 +46,16 @@ class _WaveCaptionScreenState extends ConsumerState<WaveCaptionScreen> {
     if (mounted) setState(() => _preview = ctrl);
   }
 
+  /// Returns a target bitrate in bps based on the video's display resolution.
+  /// Capped at 1080p — no 4K support in this app.
+  int _adaptiveBitrate(Size resolution) {
+    final longerSide = resolution.longestSide;
+    if (longerSide >= 2160) return 8_000_000; // 4K    → 8 Mbps
+    if (longerSide >= 1080) return 5_000_000; // 1080p → 5 Mbps
+    if (longerSide >= 720)  return 2_500_000; // 720p  → 2.5 Mbps
+    return 1_200_000;                          // 480p and below → 1.2 Mbps
+  }
+
   Future<void> _startRender() async {
     try {
       final dir = await getTemporaryDirectory();
@@ -59,7 +69,7 @@ class _WaveCaptionScreenState extends ConsumerState<WaveCaptionScreen> {
         startTime: widget.editState.trimStart,
         endTime: widget.editState.trimEnd,
         enableAudio: true,
-        bitrate: 3500000,
+        bitrate: _adaptiveBitrate(widget.editState.videoResolution),
         colorMatrixList: matrix != null ? [matrix] : [],
       );
 
