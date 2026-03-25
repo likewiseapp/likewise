@@ -9,7 +9,7 @@ class BunnyService {
   static String cdnUrl(String path) => '${BunnyConfig.cdnUrl}/$path';
 
   /// Extracts the storage path from a full CDN URL.
-  /// e.g. "https://dawnlitdev.b-cdn.net/likewise/avatars/abc_123.jpg"
+  /// e.g. "https://likewise.b-cdn.net/likewise/avatars/abc_123.jpg"
   ///   → "likewise/avatars/abc_123.jpg"
   static String? pathFromCdnUrl(String? url) {
     if (url == null || url.isEmpty) return null;

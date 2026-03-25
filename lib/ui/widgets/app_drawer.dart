@@ -172,7 +172,7 @@ class AppDrawer extends ConsumerWidget {
                     ),
                     _NavItem(
                       icon: Icons.video_library_rounded,
-                      label: 'Reels',
+                      label: 'Waves',
                       selected: currentTab == 1,
                       colors: colors,
                       isDark: isDark,
