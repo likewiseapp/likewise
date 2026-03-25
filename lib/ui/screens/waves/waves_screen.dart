@@ -138,6 +138,7 @@ class _WavesScreenState extends ConsumerState<WavesScreen> {
             itemBuilder: (context, index) => _WaveItem(
               wave: waves[index],
               controller: _player.controllers[index],
+              error: _player.errors[index],
               isActive: index == _player.currentIndex && isTabActive,
               onTogglePlayPause: () {
                 final ctrl = _player.controllers[index];
@@ -148,6 +149,10 @@ class _WavesScreenState extends ConsumerState<WavesScreen> {
               },
               onQualityChange: (label, url) =>
                   _onQualityChange(index, label, url),
+              onRetry: () {
+                _player.errors.remove(index);
+                _player.loadAndPlay(index);
+              },
             ),
           );
         },
@@ -312,16 +317,20 @@ class _WavesLoadingScreenState extends State<_WavesLoadingScreen>
 class _WaveItem extends ConsumerStatefulWidget {
   final Wave wave;
   final VideoPlayerController? controller;
+  final String? error;
   final bool isActive;
   final VoidCallback onTogglePlayPause;
   final void Function(String label, String url) onQualityChange;
+  final VoidCallback onRetry;
 
   const _WaveItem({
     required this.wave,
     required this.controller,
+    required this.error,
     required this.isActive,
     required this.onTogglePlayPause,
     required this.onQualityChange,
+    required this.onRetry,
   });
 
   @override
@@ -361,7 +370,7 @@ class _WaveItemState extends ConsumerState<_WaveItem> {
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
       builder: (_) => _QualitySheet(
-        masterUrl: widget.wave.videoUrl,
+        masterUrl: widget.wave.videoUrl ?? '',
         selectedLabel: _selectedQualityLabel,
         colors: colors,
         onSelect: (quality) {
@@ -396,7 +405,7 @@ class _WaveItemState extends ConsumerState<_WaveItem> {
             )
           else
             AppCachedImage(
-              imageUrl: widget.wave.thumbnailUrl,
+              imageUrl: widget.wave.thumbnailUrl ?? '',
               fit: BoxFit.cover,
               errorWidget: Container(color: Colors.grey.shade900),
             ),
@@ -418,8 +427,50 @@ class _WaveItemState extends ConsumerState<_WaveItem> {
             ),
           ),
 
+          // ── Error overlay ──────────────────────────────────────────────
+          if (widget.error != null)
+            Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.wifi_off_rounded,
+                      color: Colors.white54, size: 40),
+                  const SizedBox(height: 12),
+                  const Text(
+                    'Failed to load video',
+                    style: TextStyle(
+                      color: Colors.white70,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  GestureDetector(
+                    onTap: widget.onRetry,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 20, vertical: 10),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(
+                            color: Colors.white30, width: 1),
+                      ),
+                      child: const Text(
+                        'Retry',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            )
           // ── Loading indicator (controller exists but not yet ready) ────
-          if (widget.controller != null && !isReady)
+          else if (widget.controller != null && !isReady)
             const Center(
               child: CircularProgressIndicator(
                 color: Colors.white54,

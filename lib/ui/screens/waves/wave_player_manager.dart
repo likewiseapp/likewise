@@ -23,6 +23,7 @@ class WavePlayerManager {
   final void Function(VoidCallback fn) _setState;
 
   final Map<int, VideoPlayerController> controllers = {};
+  final Map<int, String> errors = {};
   List<Wave> _waves = [];
   int currentIndex = 0;
   bool firstVideoReady = false;
@@ -47,11 +48,19 @@ class WavePlayerManager {
   Future<void> loadAndPlay(int index) async {
     if (index < 0 || index >= _waves.length) return;
 
+    final rawUrl = _waves[index].videoUrl ?? '';
+    if (rawUrl.isEmpty) {
+      errors[index] = 'No video URL available';
+      _setState(() { if (index == 0) firstVideoReady = true; });
+      return;
+    }
+
     final gen = _loadGeneration;
-    final url = await _resolveUrl(_waves[index].videoUrl);
+    final url = await _resolveUrl(rawUrl);
 
     final controller = VideoPlayerController.networkUrl(
       Uri.parse(url),
+      formatHint: VideoFormat.hls,
     );
     // Replaces any stale preload — the old controller's guard will self-dispose.
     controllers[index] = controller;
@@ -94,10 +103,15 @@ class WavePlayerManager {
         controller.play();
         preload(index + 1);
       }
-    } catch (_) {
-      if (index == 0 && _isMounted() && gen == _loadGeneration) {
-        _setState(() => firstVideoReady = true);
+    } catch (e) {
+      if (_isMounted() && controllers[index] == controller) {
+        controllers.remove(index);
+        errors[index] = e.toString();
+        _setState(() {
+          if (index == 0) firstVideoReady = true;
+        });
       }
+      controller.dispose();
     }
   }
 
@@ -107,10 +121,11 @@ class WavePlayerManager {
     if (controllers.containsKey(index)) return; // already loaded or loading
 
     final gen = _loadGeneration;
-    final url = await _resolveUrl(_waves[index].videoUrl);
+    final url = await _resolveUrl(_waves[index].videoUrl ?? '');
 
     final controller = VideoPlayerController.networkUrl(
       Uri.parse(url),
+      formatHint: VideoFormat.hls,
     );
     controllers[index] = controller;
 
@@ -127,7 +142,6 @@ class WavePlayerManager {
       controller.setLooping(true);
       // Don't play — just sit ready for the swipe.
     } catch (_) {
-      // Preload failed silently — will load on demand when swiped to.
       if (controllers[index] == controller) {
         controllers.remove(index);
       }
@@ -190,7 +204,7 @@ class WavePlayerManager {
     _setState(() {});
     SchedulerBinding.instance.addPostFrameCallback((_) => old?.dispose());
 
-    final controller = VideoPlayerController.networkUrl(Uri.parse(url));
+    final controller = VideoPlayerController.networkUrl(Uri.parse(url), formatHint: VideoFormat.hls);
     controllers[index] = controller;
 
     try {

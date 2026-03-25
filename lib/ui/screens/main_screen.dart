@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:go_router/go_router.dart';
@@ -51,13 +52,23 @@ class _MainScreenState extends ConsumerState<MainScreen> {
         });
       } else if (prev is AsyncLoading && next is AsyncError) {
         setState(() {
-          _uploadError = 'Upload failed. Please try again.';
+          _uploadError = next.error.toString();
           _showSuccessBanner = false;
         });
       }
     });
 
-    return Scaffold(
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, _) {
+        if (didPop) return;
+        if (currentIndex != 0) {
+          ref.read(selectedTabProvider.notifier).setTab(0);
+        } else {
+          _showExitDialog(context);
+        }
+      },
+      child: Scaffold(
       body: Stack(
         children: [
           IndexedStack(index: currentIndex, children: _screens),
@@ -151,12 +162,40 @@ class _MainScreenState extends ConsumerState<MainScreen> {
           ),
         ],
       ),
+    ),
     );
+  }
+
+  Future<void> _showExitDialog(BuildContext context) async {
+    final colors = ref.read(appColorSchemeProvider);
+    final shouldExit = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Text('Exit App', style: TextStyle(fontWeight: FontWeight.bold)),
+        content: const Text('Are you sure you want to exit?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            style: TextButton.styleFrom(foregroundColor: colors.primary),
+            child: const Text('Exit', style: TextStyle(fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
+    if (shouldExit == true) {
+      SystemNavigator.pop();
+    }
   }
 
   Widget _buildUploadBanner(AppColorScheme colors) {
     final uploadState = ref.watch(waveUploadProvider);
     final progress = ref.watch(uploadProgressProvider);
+    final stage = ref.watch(uploadStageProvider);
     final isUploading = uploadState is AsyncLoading;
 
     final visible = isUploading || _showSuccessBanner || _uploadError != null;
@@ -225,16 +264,25 @@ class _MainScreenState extends ConsumerState<MainScreen> {
                         children: [
                           Row(
                             children: [
-                              const Icon(Icons.upload_rounded,
-                                  color: Colors.white70, size: 18),
+                              Icon(
+                                stage == UploadStage.compressing
+                                    ? Icons.compress_rounded
+                                    : Icons.upload_rounded,
+                                color: Colors.white70,
+                                size: 18,
+                              ),
                               const SizedBox(width: 8),
                               Expanded(
                                 child: Text(
-                                  progress >= 1.0
-                                      ? 'Finalizing your Wave...'
-                                      : progress > 0
-                                          ? 'Uploading your Wave...  ${(progress * 100).toInt()}%'
-                                          : 'Uploading your Wave...',
+                                  stage == UploadStage.compressing
+                                      ? progress > 0
+                                          ? 'Compressing...  ${(progress * 100).toInt()}%'
+                                          : 'Compressing your Wave...'
+                                      : progress >= 1.0
+                                          ? 'Finalizing your Wave...'
+                                          : progress > 0
+                                              ? 'Uploading your Wave...  ${(progress * 100).toInt()}%'
+                                              : 'Uploading your Wave...',
                                   style: const TextStyle(
                                       color: Colors.white,
                                       fontSize: 13,

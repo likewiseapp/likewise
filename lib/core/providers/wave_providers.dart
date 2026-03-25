@@ -6,7 +6,21 @@ import '../models/wave.dart';
 import '../services/wave_service.dart';
 import 'auth_providers.dart';
 
-/// 0.0–1.0 progress for the Bunny upload step. Reset to 0 on each new upload.
+enum UploadStage { compressing, uploading }
+
+final uploadStageProvider =
+    NotifierProvider<_UploadStageNotifier, UploadStage>(
+  _UploadStageNotifier.new,
+);
+
+class _UploadStageNotifier extends Notifier<UploadStage> {
+  @override
+  UploadStage build() => UploadStage.compressing;
+
+  void set(UploadStage stage) => state = stage;
+}
+
+/// 0.0–1.0 progress for the current stage (compress or upload).
 final uploadProgressProvider =
     NotifierProvider<_UploadProgressNotifier, double>(
   _UploadProgressNotifier.new,
@@ -36,15 +50,23 @@ class WaveUploadNotifier extends Notifier<AsyncValue<void>> {
   }
 
   Future<bool> upload(File video, String caption) async {
+    ref.read(uploadStageProvider.notifier).set(UploadStage.compressing);
     ref.read(uploadProgressProvider.notifier).set(0.0);
     state = const AsyncLoading();
+
     state = await AsyncValue.guard(
       () => _service.uploadWave(
         video,
         caption,
         _userId,
-        onProgress: (p) =>
-            ref.read(uploadProgressProvider.notifier).set(p),
+        onCompressProgress: (p) {
+          ref.read(uploadStageProvider.notifier).set(UploadStage.compressing);
+          ref.read(uploadProgressProvider.notifier).set(p);
+        },
+        onUploadProgress: (p) {
+          ref.read(uploadStageProvider.notifier).set(UploadStage.uploading);
+          ref.read(uploadProgressProvider.notifier).set(p);
+        },
       ),
     );
     return state is! AsyncError;

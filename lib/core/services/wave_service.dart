@@ -1,11 +1,12 @@
-import 'dart:convert';
 import 'dart:io';
 
-import 'package:http/http.dart' as http;
+import 'package:path_provider/path_provider.dart';
+import 'package:pro_video_editor/pro_video_editor.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../bunny_config.dart';
 import '../models/wave.dart';
+import 'bunny_service.dart';
 
 class WaveService {
   final SupabaseClient _client;
@@ -17,6 +18,7 @@ class WaveService {
         .from('waves')
         .select()
         .eq('status', 'approved')
+        .eq('transcoding_ready', true)
         .order('created_at', ascending: false);
     return (data as List).map((e) => Wave.fromJson(e)).toList();
   }
@@ -25,77 +27,55 @@ class WaveService {
     File videoFile,
     String caption,
     String userId, {
-    void Function(double progress)? onProgress,
+    void Function(double progress)? onCompressProgress,
+    void Function(double progress)? onUploadProgress,
   }) async {
-    // Step 1: Create video object in Bunny Stream
-    final createRes = await http.post(
-      Uri.parse(
-        '${BunnyConfig.streamApiBase}/library/${BunnyConfig.streamLibraryId}/videos',
-      ),
-      headers: {
-        'AccessKey': BunnyConfig.streamApiKey,
-        'Content-Type': 'application/json',
-      },
-      body: jsonEncode({
-        'title': 'wave_${DateTime.now().millisecondsSinceEpoch}',
-      }),
-    );
+    // Step 1: Compress video using native APIs (AVFoundation on iOS/macOS,
+    // Media3 on Android). p1080High ≈ CRF 22 — high quality, smaller file.
+    final tmpDir = await getTemporaryDirectory();
+    final compressedPath =
+        '${tmpDir.path}/wave_${userId}_${DateTime.now().millisecondsSinceEpoch}.mp4';
 
-    if (createRes.statusCode != 200 && createRes.statusCode != 201) {
-      throw Exception(
-        'Failed to create video: ${createRes.statusCode} ${createRes.body}',
-      );
-    }
+    final sub = ProVideoEditor.instance.progressStream
+        .listen((p) => onCompressProgress?.call(p.progress));
 
-    final videoId =
-        (jsonDecode(createRes.body) as Map<String, dynamic>)['guid'] as String;
-
-    // Step 2: Stream video bytes to Bunny (avoids loading entire file into RAM)
-    final fileLength = await videoFile.length();
-    var sentBytes = 0;
-    final client = http.Client();
     try {
-      final request = http.StreamedRequest(
-        'PUT',
-        Uri.parse(
-          '${BunnyConfig.streamApiBase}/library/${BunnyConfig.streamLibraryId}/videos/$videoId',
+      await ProVideoEditor.instance.renderVideoToFile(
+        compressedPath,
+        VideoRenderData(
+          video: EditorVideo.file(videoFile),
+          // Fixed bitrate ≈ CRF 22 quality. No transform set so the
+          // original resolution and aspect ratio are fully preserved.
+          bitrate: 6000000,
         ),
       );
-      request.headers['AccessKey'] = BunnyConfig.streamApiKey;
-      request.headers['Content-Type'] = 'application/octet-stream';
-      request.contentLength = fileLength;
-
-      videoFile.openRead().listen(
-        (chunk) {
-          request.sink.add(chunk);
-          sentBytes += chunk.length;
-          onProgress?.call(sentBytes / fileLength);
-        },
-        onDone: request.sink.close,
-        onError: request.sink.addError,
-        cancelOnError: true,
-      );
-
-      final streamed = await client.send(request);
-      final uploadRes = await http.Response.fromStream(streamed);
-
-      if (uploadRes.statusCode != 200 && uploadRes.statusCode != 201) {
-        throw Exception(
-          'Failed to upload video: ${uploadRes.statusCode} ${uploadRes.body}',
-        );
-      }
     } finally {
-      client.close();
+      await sub.cancel();
     }
 
-    // Step 3: Save record to Supabase
-    await _client.from('waves').insert({
-      'user_id': userId,
-      'video_id': videoId,
-      'video_url': '${BunnyConfig.streamCdnHostname}/$videoId/playlist.m3u8',
-      'thumbnail_url': '${BunnyConfig.streamCdnHostname}/$videoId/thumbnail.jpg',
-      'caption': caption,
-    });
+    // Step 2: Upload compressed file to Bunny Storage for admin review
+    final compressedFile = File(compressedPath);
+    try {
+      final path = BunnyPaths.rawWave(userId);
+      await BunnyService().uploadFile(
+        path,
+        compressedFile,
+        'video/mp4',
+        onProgress: onUploadProgress,
+      );
+
+      // Step 3: Save pending record — video_id/url/thumbnail null until approved
+      await _client.from('waves').insert({
+        'user_id': userId,
+        'raw_video_url': BunnyService.cdnUrl(path),
+        'caption': caption,
+        'status': 'pending',
+      });
+    } finally {
+      try {
+        await compressedFile.delete();
+      } catch (_) {}
+    }
   }
 
   Future<void> deleteWave(String waveId) async {

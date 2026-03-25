@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:http/http.dart' as http;
@@ -39,6 +40,66 @@ class BunnyService {
       throw Exception(
         'BunnyCDN upload failed: ${response.statusCode} ${response.body}',
       );
+    }
+  }
+
+  /// Streams [file] to [path] in the BunnyCDN storage zone via HTTP PUT.
+  /// Avoids loading the entire file into RAM — suitable for large video files.
+  Future<void> uploadFile(
+    String path,
+    File file,
+    String contentType, {
+    void Function(double progress)? onProgress,
+  }) async {
+    final fileLength = await file.length();
+    var sentBytes = 0;
+    final uploadUrl = '${BunnyConfig.storageUrl}/$path';
+    final client = http.Client();
+
+    try {
+      final request = http.StreamedRequest('PUT', Uri.parse(uploadUrl));
+      request.headers['AccessKey'] = BunnyConfig.apiKey;
+      request.headers['Content-Type'] = contentType;
+      request.contentLength = fileLength;
+
+      file.openRead().listen(
+        (chunk) {
+          request.sink.add(chunk);
+          sentBytes += chunk.length;
+          onProgress?.call(sentBytes / fileLength);
+        },
+        onDone: request.sink.close,
+        onError: request.sink.addError,
+        cancelOnError: true,
+      );
+
+      final streamed = await client.send(request);
+      final response = await http.Response.fromStream(streamed);
+
+      if (response.statusCode != 200 && response.statusCode != 201) {
+        throw Exception(
+          'BunnyCDN upload failed: ${response.statusCode} ${response.body}',
+        );
+      }
+    } catch (e) {
+      // Broken pipe means the server closed the connection early —
+      // make a diagnostic request to get the real HTTP error from Bunny.
+      if (e.toString().contains('Broken pipe') ||
+          e.toString().contains('errno = 32')) {
+        final probe = await http.put(
+          Uri.parse(uploadUrl),
+          headers: {
+            'AccessKey': BunnyConfig.apiKey,
+            'Content-Type': contentType,
+          },
+        );
+        throw Exception(
+          'BunnyCDN rejected upload: ${probe.statusCode} ${probe.body}',
+        );
+      }
+      rethrow;
+    } finally {
+      client.close();
     }
   }
 

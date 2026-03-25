@@ -1,6 +1,6 @@
 abstract final class BunnyConfig {
   // Bunny Storage (avatars / images)
-  static const String storageUrl = 'https://storage.bunnycdn.com/likewise';
+  static const String storageUrl = 'https://sg.storage.bunnycdn.com/likewise';
   static const String cdnUrl = 'https://likewise.b-cdn.net';
   static const String apiKey = '67306197-98fb-41b9-83a4fa0b5d1d-6280-4af6';
 
@@ -16,4 +16,7 @@ abstract final class BunnyPaths {
   static String avatar(String userId) =>
       'likewise/avatars/${userId}_${DateTime.now().millisecondsSinceEpoch}.jpg';
 
+  /// Temporary storage path for a raw wave video awaiting admin review.
+  static String rawWave(String userId) =>
+      'likewise/waves/raw/${userId}_${DateTime.now().millisecondsSinceEpoch}.mp4';
 }
