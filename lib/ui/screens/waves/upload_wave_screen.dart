@@ -19,8 +19,8 @@ class UploadWaveScreen extends ConsumerStatefulWidget {
 class _UploadWaveScreenState extends ConsumerState<UploadWaveScreen> {
   bool _busy = false;
 
-  static const int _maxFileSizeBytes = 200 * 1024 * 1024; // 200 MB
-  static const Duration _maxDuration = Duration(minutes: 2);
+  static const int _maxFileSizeBytes = 150 * 1024 * 1024; // 150 MB
+  static const Duration _maxDuration = Duration(seconds: 62); // 1 min 2 sec
 
   @override
   void initState() {
@@ -61,7 +61,7 @@ class _UploadWaveScreenState extends ConsumerState<UploadWaveScreen> {
               ),
               const SizedBox(height: 4),
               const Text(
-                'Max 2 minutes · 200 MB',
+                'Max 1 min 2 sec · 150 MB',
                 style: TextStyle(color: Colors.white38, fontSize: 12),
               ),
               const SizedBox(height: 16),
@@ -153,7 +153,7 @@ class _UploadWaveScreenState extends ConsumerState<UploadWaveScreen> {
           style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700),
         ),
         content: const Text(
-          'Videos must be 2 minutes or less.',
+          'Videos must be 1 minute 2 seconds or less.',
           style: TextStyle(color: Colors.white70),
         ),
         actions: [
@@ -180,7 +180,7 @@ class _UploadWaveScreenState extends ConsumerState<UploadWaveScreen> {
           style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700),
         ),
         content: const Text(
-          'Please choose a video under 200 MB.',
+          'Please choose a video under 150 MB.',
           style: TextStyle(color: Colors.white70),
         ),
         actions: [
