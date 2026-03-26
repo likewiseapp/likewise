@@ -8,24 +8,11 @@ class AuthService {
   Future<AuthResponse> signUp({
     required String email,
     required String password,
-    required String fullName,
-    required String username,
   }) async {
-    final response = await _client.auth.signUp(
+    return _client.auth.signUp(
       email: email,
       password: password,
     );
-
-    if (response.user != null) {
-      await _client.from('profiles').upsert({
-        'id': response.user!.id,
-        'email': email,
-        'username': username,
-        'full_name': fullName,
-      }, onConflict: 'id');
-    }
-
-    return response;
   }
 
   Future<AuthResponse> signIn({
@@ -40,6 +27,10 @@ class AuthService {
 
   Future<void> signOut() async {
     await _client.auth.signOut();
+  }
+
+  Future<void> sendPasswordReset({required String email}) async {
+    await _client.auth.resetPasswordForEmail(email);
   }
 
   /// Returns true if the username is available (not taken).

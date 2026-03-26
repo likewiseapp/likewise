@@ -1,5 +1,4 @@
-import 'dart:async';
-
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -19,15 +18,11 @@ class _AuthScreenState extends ConsumerState<AuthScreen>
   late final TabController _tabController;
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
-  final _nameController = TextEditingController();
-  final _usernameController = TextEditingController();
+
   bool _loading = false;
   String? _error;
-
-  // Username availability
-  bool? _usernameAvailable;   // null = unchecked, true = available, false = taken
-  bool _checkingUsername = false;
-  Timer? _usernameDebounce;
+  bool _obscurePassword = true;
+  bool _agreedToTerms = false;
 
   @override
   void initState() {
@@ -35,46 +30,23 @@ class _AuthScreenState extends ConsumerState<AuthScreen>
     _tabController = TabController(length: 2, vsync: this);
     _tabController.addListener(() {
       if (_tabController.indexIsChanging) {
-        setState(() => _error = null);
+        setState(() {
+          _error = null;
+          _emailController.clear();
+          _passwordController.clear();
+          _agreedToTerms = false;
+          _obscurePassword = true;
+        });
       }
     });
   }
 
   @override
   void dispose() {
-    _usernameDebounce?.cancel();
     _tabController.dispose();
     _emailController.dispose();
     _passwordController.dispose();
-    _nameController.dispose();
-    _usernameController.dispose();
     super.dispose();
-  }
-
-  void _onUsernameChanged(String value) {
-    _usernameDebounce?.cancel();
-    final trimmed = value.trim();
-    if (trimmed.isEmpty) {
-      setState(() {
-        _usernameAvailable = null;
-        _checkingUsername = false;
-      });
-      return;
-    }
-    setState(() {
-      _usernameAvailable = null;
-      _checkingUsername = true;
-    });
-    _usernameDebounce = Timer(const Duration(milliseconds: 600), () async {
-      final available =
-          await ref.read(authServiceProvider).isUsernameAvailable(trimmed);
-      if (mounted) {
-        setState(() {
-          _usernameAvailable = available;
-          _checkingUsername = false;
-        });
-      }
-    });
   }
 
   Future<void> _signIn() async {
@@ -95,8 +67,8 @@ class _AuthScreenState extends ConsumerState<AuthScreen>
   }
 
   Future<void> _signUp() async {
-    if (_usernameAvailable != true) {
-      setState(() => _error = 'Please choose an available username.');
+    if (!_agreedToTerms) {
+      setState(() => _error = 'Please agree to the Terms & Conditions.');
       return;
     }
     setState(() {
@@ -107,8 +79,6 @@ class _AuthScreenState extends ConsumerState<AuthScreen>
       await ref.read(authServiceProvider).signUp(
             email: _emailController.text.trim(),
             password: _passwordController.text,
-            fullName: _nameController.text.trim(),
-            username: _usernameController.text.trim().toLowerCase(),
           );
     } catch (e) {
       if (mounted) setState(() => _error = e.toString());
@@ -117,10 +87,69 @@ class _AuthScreenState extends ConsumerState<AuthScreen>
     }
   }
 
+  void _showTerms() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: isDark ? AppColors.darkSurface : Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (_) => Padding(
+        padding: const EdgeInsets.fromLTRB(24, 16, 24, 40),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Center(
+              child: Container(
+                width: 36,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade400,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ),
+            const SizedBox(height: 20),
+            Text(
+              'Terms & Conditions',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w800,
+                color: isDark ? Colors.white : Colors.black,
+              ),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              'By creating an account, you agree to use Likewise responsibly. '
+              'We reserve the right to suspend accounts that violate community guidelines. '
+              'Your data is handled in accordance with our Privacy Policy.',
+              style: TextStyle(
+                fontSize: 14,
+                height: 1.6,
+                color: Colors.grey.shade500,
+              ),
+            ),
+            const SizedBox(height: 24),
+            SizedBox(
+              width: double.infinity,
+              child: TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Close'),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final colors = ref.watch(appColorSchemeProvider);
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final isSignUp = _tabController.index == 1;
 
     return Scaffold(
       backgroundColor:
@@ -128,44 +157,48 @@ class _AuthScreenState extends ConsumerState<AuthScreen>
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
-            padding: const EdgeInsets.symmetric(horizontal: 32),
+            padding: const EdgeInsets.symmetric(horizontal: 28),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                // Logo / Header
+                const SizedBox(height: 12),
+
+                // ── Logo ────────────────────────────────────────────────────
                 Container(
-                  width: 72,
-                  height: 72,
+                  width: 80,
+                  height: 80,
                   decoration: BoxDecoration(
                     gradient: LinearGradient(
                       colors: [colors.primary, colors.accent],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
                     ),
-                    borderRadius: BorderRadius.circular(20),
+                    borderRadius: BorderRadius.circular(24),
                     boxShadow: [
                       BoxShadow(
-                        color: colors.primary.withValues(alpha: 0.3),
-                        blurRadius: 20,
-                        offset: const Offset(0, 8),
+                        color: colors.primary.withValues(alpha: 0.35),
+                        blurRadius: 24,
+                        offset: const Offset(0, 10),
                       ),
                     ],
                   ),
                   child: const Icon(
                     Icons.people_alt_rounded,
                     color: Colors.white,
-                    size: 36,
+                    size: 38,
                   ),
                 ),
-                const SizedBox(height: 20),
+                const SizedBox(height: 18),
                 Text(
                   'likewise',
                   style: TextStyle(
-                    fontSize: 28,
+                    fontSize: 30,
                     fontWeight: FontWeight.w900,
                     letterSpacing: -0.5,
                     color: isDark ? Colors.white : Colors.black,
                   ),
                 ),
-                const SizedBox(height: 6),
+                const SizedBox(height: 4),
                 Text(
                   'Find your people',
                   style: TextStyle(
@@ -176,24 +209,34 @@ class _AuthScreenState extends ConsumerState<AuthScreen>
                 ),
                 const SizedBox(height: 32),
 
-                // Tab bar
+                // ── Tab bar ──────────────────────────────────────────────────
                 Container(
                   decoration: BoxDecoration(
                     color: isDark
                         ? Colors.white.withValues(alpha: 0.06)
-                        : Colors.black.withValues(alpha: 0.04),
+                        : Colors.black.withValues(alpha: 0.05),
                     borderRadius: BorderRadius.circular(14),
                   ),
+                  padding: const EdgeInsets.all(4),
                   child: TabBar(
                     controller: _tabController,
                     indicatorSize: TabBarIndicatorSize.tab,
                     indicator: BoxDecoration(
-                      color: colors.primary,
-                      borderRadius: BorderRadius.circular(14),
+                      gradient: LinearGradient(
+                        colors: [colors.primary, colors.accent],
+                      ),
+                      borderRadius: BorderRadius.circular(11),
+                      boxShadow: [
+                        BoxShadow(
+                          color: colors.primary.withValues(alpha: 0.25),
+                          blurRadius: 8,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
                     ),
                     labelColor: Colors.white,
                     unselectedLabelColor:
-                        isDark ? Colors.white60 : Colors.black54,
+                        isDark ? Colors.white54 : Colors.black45,
                     labelStyle: const TextStyle(
                       fontWeight: FontWeight.w700,
                       fontSize: 14,
@@ -205,56 +248,18 @@ class _AuthScreenState extends ConsumerState<AuthScreen>
                     ],
                   ),
                 ),
-                const SizedBox(height: 24),
+                const SizedBox(height: 28),
 
-                // Tab content
+                // ── Form fields ──────────────────────────────────────────────
                 AnimatedBuilder(
                   animation: _tabController,
                   builder: (context, _) {
                     return Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        if (_tabController.index == 1) ...[
-                          _buildField(
-                            controller: _nameController,
-                            hint: 'Full name',
-                            icon: Icons.person_outline_rounded,
-                            isDark: isDark,
-                            colors: colors,
-                          ),
-                          const SizedBox(height: 12),
-                          _buildField(
-                            controller: _usernameController,
-                            hint: 'Username',
-                            icon: Icons.alternate_email_rounded,
-                            isDark: isDark,
-                            colors: colors,
-                            onChanged: _onUsernameChanged,
-                            suffixIcon: _checkingUsername
-                                ? const SizedBox(
-                                    width: 16,
-                                    height: 16,
-                                    child: Padding(
-                                      padding: EdgeInsets.all(12),
-                                      child: CircularProgressIndicator(strokeWidth: 2),
-                                    ),
-                                  )
-                                : _usernameAvailable == null
-                                    ? null
-                                    : Icon(
-                                        _usernameAvailable!
-                                            ? Icons.check_circle_rounded
-                                            : Icons.cancel_rounded,
-                                        color: _usernameAvailable!
-                                            ? Colors.green
-                                            : Colors.redAccent,
-                                        size: 20,
-                                      ),
-                          ),
-                          const SizedBox(height: 12),
-                        ],
                         _buildField(
                           controller: _emailController,
-                          hint: 'Email',
+                          hint: 'Email address',
                           icon: Icons.email_outlined,
                           isDark: isDark,
                           colors: colors,
@@ -267,49 +272,111 @@ class _AuthScreenState extends ConsumerState<AuthScreen>
                           icon: Icons.lock_outline_rounded,
                           isDark: isDark,
                           colors: colors,
-                          obscure: true,
+                          obscure: _obscurePassword,
+                          suffixIcon: IconButton(
+                            icon: Icon(
+                              _obscurePassword
+                                  ? Icons.visibility_off_outlined
+                                  : Icons.visibility_outlined,
+                              size: 20,
+                              color: Colors.grey.shade500,
+                            ),
+                            onPressed: () => setState(
+                                () => _obscurePassword = !_obscurePassword),
+                          ),
                         ),
+
+                        // ── Sign In extras ───────────────────────────────────
+                        if (!isSignUp) ...[
+                          const SizedBox(height: 8),
+                          Align(
+                            alignment: Alignment.centerRight,
+                            child: TextButton(
+                              onPressed: _loading ? null : _showForgotPassword,
+                              style: TextButton.styleFrom(
+                                padding:
+                                    const EdgeInsets.symmetric(horizontal: 4),
+                                minimumSize: Size.zero,
+                                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                              ),
+                              child: Text(
+                                'Forgot password?',
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  color: colors.primary,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+
+                        // ── Sign Up extras ───────────────────────────────────
+                        if (isSignUp) ...[
+                          const SizedBox(height: 16),
+                          _buildTermsRow(isDark, colors),
+                        ],
+
                         const SizedBox(height: 20),
 
-                        // Error message
+                        // ── Error ────────────────────────────────────────────
                         if (_error != null)
                           Padding(
                             padding: const EdgeInsets.only(bottom: 12),
-                            child: Text(
-                              _error!,
-                              style: const TextStyle(
-                                color: Colors.redAccent,
-                                fontSize: 13,
-                                fontWeight: FontWeight.w500,
+                            child: Container(
+                              width: double.infinity,
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 14, vertical: 10),
+                              decoration: BoxDecoration(
+                                color: Colors.redAccent.withValues(alpha: 0.1),
+                                borderRadius: BorderRadius.circular(10),
+                                border: Border.all(
+                                  color:
+                                      Colors.redAccent.withValues(alpha: 0.3),
+                                ),
                               ),
-                              textAlign: TextAlign.center,
+                              child: Text(
+                                _error!,
+                                style: const TextStyle(
+                                  color: Colors.redAccent,
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                                textAlign: TextAlign.center,
+                              ),
                             ),
                           ),
 
-                        // Submit button
+                        // ── Submit button ─────────────────────────────────────
                         SizedBox(
                           width: double.infinity,
-                          height: 50,
-                          child: GestureDetector(
-                            onTap: _loading
+                          height: 52,
+                          child: MaterialButton(
+                            onPressed: _loading
                                 ? null
-                                : (_tabController.index == 0
-                                    ? _signIn
-                                    : _signUp),
-                            child: Container(
+                                : (isSignUp ? _signUp : _signIn),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(14),
+                            ),
+                            padding: EdgeInsets.zero,
+                            child: Ink(
                               decoration: BoxDecoration(
                                 gradient: LinearGradient(
-                                  colors: [colors.primary, colors.accent],
+                                  colors: _loading
+                                      ? [Colors.grey.shade400, Colors.grey.shade400]
+                                      : [colors.primary, colors.accent],
                                 ),
                                 borderRadius: BorderRadius.circular(14),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color:
-                                        colors.primary.withValues(alpha: 0.3),
-                                    blurRadius: 12,
-                                    offset: const Offset(0, 4),
-                                  ),
-                                ],
+                                boxShadow: _loading
+                                    ? []
+                                    : [
+                                        BoxShadow(
+                                          color: colors.primary
+                                              .withValues(alpha: 0.35),
+                                          blurRadius: 14,
+                                          offset: const Offset(0, 5),
+                                        ),
+                                      ],
                               ),
                               child: Center(
                                 child: _loading
@@ -322,9 +389,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen>
                                         ),
                                       )
                                     : Text(
-                                        _tabController.index == 0
-                                            ? 'Sign In'
-                                            : 'Create Account',
+                                        isSignUp ? 'Create Account' : 'Sign In',
                                         style: const TextStyle(
                                           color: Colors.white,
                                           fontWeight: FontWeight.w700,
@@ -339,11 +404,173 @@ class _AuthScreenState extends ConsumerState<AuthScreen>
                     );
                   },
                 ),
+
+                const SizedBox(height: 24),
               ],
             ),
           ),
         ),
       ),
+    );
+  }
+
+  Widget _buildTermsRow(bool isDark, AppColorScheme colors) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        SizedBox(
+          width: 24,
+          height: 24,
+          child: Checkbox(
+            value: _agreedToTerms,
+            onChanged: _loading
+                ? null
+                : (v) => setState(() => _agreedToTerms = v ?? false),
+            activeColor: colors.primary,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(5),
+            ),
+            side: BorderSide(
+              color: isDark
+                  ? Colors.white.withValues(alpha: 0.3)
+                  : Colors.black.withValues(alpha: 0.2),
+            ),
+            materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+          ),
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: RichText(
+            text: TextSpan(
+              style: TextStyle(
+                fontSize: 13,
+                color: Colors.grey.shade500,
+                fontWeight: FontWeight.w500,
+              ),
+              children: [
+                const TextSpan(text: 'I agree to the '),
+                TextSpan(
+                  text: 'Terms & Conditions',
+                  style: TextStyle(
+                    color: colors.primary,
+                    fontWeight: FontWeight.w700,
+                    decoration: TextDecoration.underline,
+                    decorationColor: colors.primary,
+                  ),
+                  recognizer: TapGestureRecognizer()..onTap = _showTerms,
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  void _showForgotPassword() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final emailCtrl = TextEditingController(text: _emailController.text.trim());
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: isDark ? AppColors.darkSurface : Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) {
+        final colors = ref.read(appColorSchemeProvider);
+        return Padding(
+          padding: EdgeInsets.fromLTRB(
+              24, 16, 24, MediaQuery.of(ctx).viewInsets.bottom + 40),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                  width: 36,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade400,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 20),
+              Text(
+                'Reset Password',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w800,
+                  color: isDark ? Colors.white : Colors.black,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Enter your email and we\'ll send you a reset link.',
+                style: TextStyle(fontSize: 14, color: Colors.grey.shade500),
+              ),
+              const SizedBox(height: 20),
+              _buildField(
+                controller: emailCtrl,
+                hint: 'Email address',
+                icon: Icons.email_outlined,
+                isDark: isDark,
+                colors: colors,
+                keyboardType: TextInputType.emailAddress,
+              ),
+              const SizedBox(height: 20),
+              SizedBox(
+                width: double.infinity,
+                height: 50,
+                child: MaterialButton(
+                  onPressed: () async {
+                    try {
+                      await ref
+                          .read(authServiceProvider)
+                          .sendPasswordReset(email: emailCtrl.text.trim());
+                      if (ctx.mounted) Navigator.pop(ctx);
+                      if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                              content: Text('Reset link sent — check your email.')),
+                        );
+                      }
+                    } catch (e) {
+                      if (ctx.mounted) {
+                        ScaffoldMessenger.of(ctx).showSnackBar(
+                          SnackBar(content: Text(e.toString())),
+                        );
+                      }
+                    }
+                  },
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  padding: EdgeInsets.zero,
+                  child: Ink(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                          colors: [colors.primary, colors.accent]),
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    child: const Center(
+                      child: Text(
+                        'Send Reset Link',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w700,
+                          fontSize: 15,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 
@@ -362,13 +589,22 @@ class _AuthScreenState extends ConsumerState<AuthScreen>
       decoration: BoxDecoration(
         color: isDark
             ? Colors.white.withValues(alpha: 0.06)
-            : Colors.white.withValues(alpha: 0.8),
+            : Colors.white.withValues(alpha: 0.9),
         borderRadius: BorderRadius.circular(14),
         border: Border.all(
           color: isDark
               ? Colors.white.withValues(alpha: 0.08)
-              : Colors.black.withValues(alpha: 0.06),
+              : Colors.black.withValues(alpha: 0.07),
         ),
+        boxShadow: isDark
+            ? []
+            : [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.04),
+                  blurRadius: 8,
+                  offset: const Offset(0, 2),
+                ),
+              ],
       ),
       child: TextField(
         controller: controller,
@@ -378,18 +614,20 @@ class _AuthScreenState extends ConsumerState<AuthScreen>
         style: TextStyle(
           color: isDark ? Colors.white : Colors.black,
           fontWeight: FontWeight.w500,
+          fontSize: 15,
         ),
         decoration: InputDecoration(
           prefixIcon: Icon(icon, size: 20, color: colors.primary),
           suffixIcon: suffixIcon,
           hintText: hint,
           hintStyle: TextStyle(
-            color: Colors.grey.shade500,
+            color: Colors.grey.shade400,
             fontWeight: FontWeight.w400,
+            fontSize: 15,
           ),
           border: InputBorder.none,
           contentPadding:
-              const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+              const EdgeInsets.symmetric(horizontal: 16, vertical: 15),
         ),
       ),
     );

@@ -11,6 +11,7 @@ import '../../../core/providers/hobby_providers.dart';
 import '../../../core/providers/profile_providers.dart';
 import '../../../core/theme_provider.dart';
 import '../../widgets/app_cached_image.dart';
+import '../../widgets/profile_completion_banner.dart';
 
 class ProfileScreen extends ConsumerStatefulWidget {
   const ProfileScreen({super.key});
@@ -258,6 +259,9 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                         ),
 
                       const SizedBox(height: 12),
+
+                      // ── Profile completion card ─────────────────────────
+                      const ProfileCompletionCard(),
 
                       Row(
                         children: [

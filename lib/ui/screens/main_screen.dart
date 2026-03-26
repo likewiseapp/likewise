@@ -8,6 +8,7 @@ import '../../core/app_theme.dart';
 import '../../core/providers/navigation_providers.dart';
 import '../../core/providers/wave_providers.dart';
 import '../../core/theme_provider.dart';
+import '../widgets/profile_completion_banner.dart';
 import 'explore/explore_screen.dart';
 import 'explore/search_screen.dart';
 import 'profile/profile_screen.dart';
@@ -30,6 +31,7 @@ class _MainScreenState extends ConsumerState<MainScreen> {
 
   bool _showSuccessBanner = false;
   String? _uploadError;
+  bool _profileBannerDismissed = false;
 
   @override
   Widget build(BuildContext context) {
@@ -72,6 +74,18 @@ class _MainScreenState extends ConsumerState<MainScreen> {
       body: Stack(
         children: [
           IndexedStack(index: currentIndex, children: _screens),
+
+          // ── Profile completion banner (home tab only) ─────────────
+          if (currentIndex == 0 && !_profileBannerDismissed)
+            Positioned(
+              left: 16,
+              right: 16,
+              top: MediaQuery.of(context).padding.top + 12,
+              child: ProfileCompletionBanner(
+                onDismiss: () =>
+                    setState(() => _profileBannerDismissed = true),
+              ),
+            ),
 
           // ── Upload progress banner ────────────────────────────────
           _buildUploadBanner(colors),
