@@ -29,8 +29,26 @@ class AuthService {
     await _client.auth.signOut();
   }
 
-  Future<void> sendPasswordReset({required String email}) async {
-    await _client.auth.resetPasswordForEmail(email);
+  Future<void> sendPasswordResetOTP({required String email}) async {
+    await _client.auth.signInWithOtp(
+      email: email.trim(),
+      shouldCreateUser: false,
+    );
+  }
+
+  Future<AuthResponse> verifyPasswordResetOTP({
+    required String email,
+    required String otp,
+  }) async {
+    return _client.auth.verifyOTP(
+      type: OtpType.email,
+      email: email.trim(),
+      token: otp.trim(),
+    );
+  }
+
+  Future<UserResponse> updatePassword(String newPassword) async {
+    return _client.auth.updateUser(UserAttributes(password: newPassword));
   }
 
   /// Returns true if the username is available (not taken).

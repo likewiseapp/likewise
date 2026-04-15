@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "501605932947",
+    "project_id": "likewise-9051f",
+    "storage_bucket": "likewise-9051f.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:501605932947:android:18cd7a6a767d204b3c9266",
+        "android_client_info": {
+          "package_name": "com.likewise.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAr2ElsuPyUJ1Gv0zV4fFrXn80psffJBZQ"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

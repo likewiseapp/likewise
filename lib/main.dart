@@ -1,11 +1,13 @@
+import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'core/app_theme.dart';
+import 'core/providers/auth_providers.dart';
+import 'core/providers/profile_providers.dart';
 import 'core/supabase_config.dart';
 import 'core/theme_provider.dart';
-import 'core/providers/profile_providers.dart';
 import 'router.dart';
 
 Future<void> main() async {
@@ -19,6 +21,8 @@ Future<void> main() async {
     anonKey: SupabaseConfig.anonKey,
   );
 
+  await Firebase.initializeApp();
+
   runApp(const ProviderScope(child: LikewiseApp()));
 }
 
@@ -29,6 +33,19 @@ class LikewiseApp extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final colors = ref.watch(appColorSchemeProvider);
     final router = ref.watch(routerProvider);
+
+    // Initialize push notifications + react to auth changes.
+    ref.listen(authStateProvider, (_, next) {
+      final push = ref.read(pushNotificationServiceProvider);
+      push.init();
+      final event = next.whenData((s) => s.event).value;
+      if (event == AuthChangeEvent.signedIn ||
+          event == AuthChangeEvent.tokenRefreshed) {
+        push.registerDevice();
+      } else if (event == AuthChangeEvent.signedOut) {
+        push.unregisterDevice();
+      }
+    });
 
     // Restore the user's saved theme preference whenever their profile loads.
     // This fires whenever fullProfileProvider transitions from loading → data,

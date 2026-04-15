@@ -11,6 +11,7 @@ import 'core/providers/auth_providers.dart';
 import 'core/theme_provider.dart';
 import 'ui/screens/auth/auth_screen.dart';
 import 'ui/screens/auth/complete_profile_screen.dart';
+import 'ui/screens/auth/forgot_password_screen.dart';
 import 'ui/screens/social/blocked_users_screen.dart';
 import 'ui/screens/messages/chat_screen.dart';
 import 'ui/screens/main_screen.dart';
@@ -68,6 +69,11 @@ final routerProvider = Provider<GoRouter>((ref) {
         _ => null,
       };
 
+      // ── Password recovery flow: never redirect away ─────────────────────
+      // The user becomes authenticated mid-flow (after OTP verify), but we
+      // must keep them on this screen to finish setting a new password.
+      if (loc == '/forgot-password') return null;
+
       // ── Splash ──────────────────────────────────────────────────────────
       if (loc == '/splash') {
         if (!isAuthenticated) return '/auth';
@@ -77,7 +83,8 @@ final routerProvider = Provider<GoRouter>((ref) {
 
       // ── Not authenticated ────────────────────────────────────────────────
       if (!isAuthenticated) {
-        return (loc == '/auth') ? null : '/auth';
+        const publicRoutes = {'/auth', '/forgot-password'};
+        return publicRoutes.contains(loc) ? null : '/auth';
       }
 
       // ── Authenticated, no profile ────────────────────────────────────────
@@ -100,6 +107,10 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/auth',
         builder: (context, state) => const AuthScreen(),
+      ),
+      GoRoute(
+        path: '/forgot-password',
+        builder: (context, state) => const ForgotPasswordScreen(),
       ),
       GoRoute(
         path: '/complete-profile',
