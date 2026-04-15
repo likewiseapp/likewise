@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../services/auth_service.dart';
+import '../services/google_auth_service.dart';
 
 // ── Profile-exists notifier ───────────────────────────────────────────────────
 // Tracks whether the authenticated user has a profile row.
@@ -42,6 +43,10 @@ final supabaseProvider = Provider<SupabaseClient>((ref) {
 
 final authServiceProvider = Provider<AuthService>((ref) {
   return AuthService(ref.watch(supabaseProvider));
+});
+
+final googleAuthServiceProvider = Provider<GoogleAuthService>((ref) {
+  return GoogleAuthService(ref.watch(supabaseProvider));
 });
 
 final authStateProvider = StreamProvider<AuthState>((ref) {
