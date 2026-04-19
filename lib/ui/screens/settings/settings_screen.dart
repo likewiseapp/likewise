@@ -9,6 +9,8 @@ import '../../../core/providers/profile_providers.dart';
 import '../../../core/services/profile_service.dart';
 import '../../../core/app_theme.dart';
 import '../../../core/theme_provider.dart';
+import 'change_password_sheet.dart';
+import 'report_problem_sheet.dart';
 
 class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});
@@ -68,7 +70,7 @@ class SettingsScreen extends ConsumerWidget {
             ),
           ),
 
-          const SliverToBoxAdapter(child: SizedBox(height: 24)),
+          const SliverToBoxAdapter(child: SizedBox(height: 14)),
 
           // ── Account ────────────────────────────────────────────────
           _SectionLabel(text: 'Account', color: subtleText),
@@ -81,19 +83,12 @@ class SettingsScreen extends ConsumerWidget {
                 label: 'Change Password',
                 iconColor: iconColor,
                 textColor: tileText,
-                onTap: () {},
-              ),
-              _Tile(
-                icon: Icons.email_outlined,
-                label: 'Email Address',
-                iconColor: iconColor,
-                textColor: tileText,
-                onTap: () {},
+                onTap: () => showChangePasswordSheet(context),
               ),
             ],
           ),
 
-          const SliverToBoxAdapter(child: SizedBox(height: 32)),
+          const SliverToBoxAdapter(child: SizedBox(height: 18)),
 
           // ── Preferences ────────────────────────────────────────────
           _SectionLabel(text: 'Preferences', color: subtleText),
@@ -114,20 +109,12 @@ class SettingsScreen extends ConsumerWidget {
                 label: 'Notifications',
                 iconColor: iconColor,
                 textColor: tileText,
-                onTap: () {},
-              ),
-              _Tile(
-                icon: Icons.language_rounded,
-                label: 'Language',
-                iconColor: iconColor,
-                textColor: tileText,
-                value: 'English',
-                onTap: () {},
+                onTap: () => context.push('/notifications-settings'),
               ),
             ],
           ),
 
-          const SliverToBoxAdapter(child: SizedBox(height: 32)),
+          const SliverToBoxAdapter(child: SizedBox(height: 18)),
 
           // ── Privacy ────────────────────────────────────────────────
           _SectionLabel(text: 'Privacy', color: subtleText),
@@ -183,7 +170,7 @@ class SettingsScreen extends ConsumerWidget {
             ],
           ),
 
-          const SliverToBoxAdapter(child: SizedBox(height: 32)),
+          const SliverToBoxAdapter(child: SizedBox(height: 18)),
 
           // ── Support ────────────────────────────────────────────────
           _SectionLabel(text: 'Support', color: subtleText),
@@ -192,18 +179,11 @@ class SettingsScreen extends ConsumerWidget {
             dividerColor: divider,
             tiles: [
               _Tile(
-                icon: Icons.help_outline_rounded,
-                label: 'Help Center',
-                iconColor: iconColor,
-                textColor: tileText,
-                onTap: () {},
-              ),
-              _Tile(
                 icon: Icons.flag_outlined,
                 label: 'Report a Problem',
                 iconColor: iconColor,
                 textColor: tileText,
-                onTap: () {},
+                onTap: () => showReportProblemSheet(context),
               ),
               _Tile(
                 icon: Icons.info_outline_rounded,
@@ -216,7 +196,7 @@ class SettingsScreen extends ConsumerWidget {
             ],
           ),
 
-          const SliverToBoxAdapter(child: SizedBox(height: 32)),
+          const SliverToBoxAdapter(child: SizedBox(height: 18)),
 
           // ── Log Out / Delete ───────────────────────────────────────
           _SectionCard(
@@ -249,14 +229,14 @@ class SettingsScreen extends ConsumerWidget {
                 iconColor: Colors.red.withValues(alpha: 0.7),
                 textColor: Colors.red.withValues(alpha: 0.85),
                 showChevron: false,
-                onTap: () {},
+                onTap: () => context.push('/delete-account'),
               ),
             ],
           ),
 
           SliverToBoxAdapter(
             child: SizedBox(
-              height: MediaQuery.of(context).padding.bottom + 40,
+              height: MediaQuery.of(context).padding.bottom + 24,
             ),
           ),
         ],
@@ -276,12 +256,13 @@ class _SectionLabel extends StatelessWidget {
   Widget build(BuildContext context) {
     return SliverToBoxAdapter(
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(20, 0, 20, 6),
+        padding: const EdgeInsets.fromLTRB(20, 0, 20, 4),
         child: Text(
           text,
           style: TextStyle(
-            fontSize: 13,
+            fontSize: 12,
             fontWeight: FontWeight.w600,
+            letterSpacing: 0.2,
             color: color,
           ),
         ),
@@ -321,7 +302,7 @@ class _SectionCard extends StatelessWidget {
               tiles[i],
               if (i < tiles.length - 1)
                 Padding(
-                  padding: const EdgeInsets.only(left: 52),
+                  padding: const EdgeInsets.only(left: 46),
                   child: Divider(height: 1, color: dividerColor),
                 ),
             ],
@@ -363,20 +344,20 @@ class _Tile extends StatelessWidget {
       },
       behavior: HitTestBehavior.opaque,
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 13),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 9),
         child: Row(
           children: [
             SizedBox(
-              width: 24,
-              child: Icon(icon, size: 20, color: iconColor),
+              width: 22,
+              child: Icon(icon, size: 18, color: iconColor),
             ),
-            const SizedBox(width: 12),
+            const SizedBox(width: 10),
             Expanded(
               child: Text(
                 label,
                 style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w400,
+                  fontSize: 14.5,
+                  fontWeight: FontWeight.w500,
                   color: textColor,
                 ),
               ),
@@ -385,15 +366,15 @@ class _Tile extends StatelessWidget {
               Text(
                 value!,
                 style: TextStyle(
-                  fontSize: 15,
-                  color: isDark ? Colors.white30 : Colors.black26,
+                  fontSize: 13,
+                  color: isDark ? Colors.white30 : Colors.black38,
                 ),
               ),
             if (showChevron) ...[
-              const SizedBox(width: 4),
+              const SizedBox(width: 2),
               Icon(
                 Icons.chevron_right_rounded,
-                size: 20,
+                size: 18,
                 color: isDark
                     ? Colors.white.withValues(alpha: 0.2)
                     : Colors.black.withValues(alpha: 0.2),
@@ -438,14 +419,14 @@ class _SwitchTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.only(left: 16, right: 8, top: 6, bottom: 6),
+      padding: const EdgeInsets.only(left: 16, right: 8, top: 2, bottom: 2),
       child: Row(
         children: [
           SizedBox(
-            width: 24,
+            width: 22,
             child: Icon(icon, size: iconSize, color: iconColor),
           ),
-          const SizedBox(width: 12),
+          const SizedBox(width: 10),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -453,20 +434,22 @@ class _SwitchTile extends StatelessWidget {
                 Text(
                   label,
                   style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w400,
+                    fontSize: 14.5,
+                    fontWeight: FontWeight.w500,
                     color: textColor,
                   ),
                 ),
                 const SizedBox(height: 1),
                 Text(
                   subtitle,
-                  style: TextStyle(fontSize: 12, color: subtitleColor),
+                  style: TextStyle(fontSize: 11, color: subtitleColor),
                 ),
               ],
             ),
           ),
-          Switch.adaptive(
+          Transform.scale(
+            scale: 0.85,
+            child: Switch.adaptive(
             value: value,
             onChanged: onChanged,
             activeThumbColor: activeColor,
@@ -475,6 +458,7 @@ class _SwitchTile extends StatelessWidget {
             inactiveTrackColor: isDark
                 ? Colors.white.withValues(alpha: 0.1)
                 : Colors.black.withValues(alpha: 0.08),
+            ),
           ),
         ],
       ),

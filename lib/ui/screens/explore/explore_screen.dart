@@ -15,7 +15,7 @@ import '../../../core/providers/notification_providers.dart';
 import '../../../core/providers/profile_providers.dart';
 import '../../../core/theme_provider.dart';
 import '../../widgets/app_cached_image.dart';
-import '../../widgets/app_drawer.dart';
+import '../../../core/providers/navigation_providers.dart';
 import '../../widgets/user_profile_card.dart';
 
 class ExploreScreen extends ConsumerStatefulWidget {
@@ -27,7 +27,6 @@ class ExploreScreen extends ConsumerStatefulWidget {
 
 class _ExploreScreenState extends ConsumerState<ExploreScreen>
     with TickerProviderStateMixin {
-  final _scaffoldKey = GlobalKey<ScaffoldState>();
   late final AnimationController _orbitController;
   int _nearbyLimit = 5;
 
@@ -99,8 +98,6 @@ class _ExploreScreenState extends ConsumerState<ExploreScreen>
         .toList();
 
     return Scaffold(
-      key: _scaffoldKey,
-      drawer: const AppDrawer(),
       body: SafeArea(
         child: CustomScrollView(
           slivers: [
@@ -117,7 +114,10 @@ class _ExploreScreenState extends ConsumerState<ExploreScreen>
                         GestureDetector(
                           onTap: () {
                             HapticFeedback.lightImpact();
-                            _scaffoldKey.currentState?.openDrawer();
+                            ref
+                                .read(mainScaffoldKeyProvider)
+                                .currentState
+                                ?.openDrawer();
                           },
                           child: Icon(
                             Icons.menu_rounded,

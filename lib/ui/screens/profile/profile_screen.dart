@@ -11,6 +11,7 @@ import '../../../core/providers/hobby_providers.dart';
 import '../../../core/providers/profile_providers.dart';
 import '../../../core/theme_provider.dart';
 import '../../widgets/app_cached_image.dart';
+import '../../widgets/avatar_popup.dart';
 import '../../widgets/profile_completion_banner.dart';
 
 class ProfileScreen extends ConsumerStatefulWidget {
@@ -115,21 +116,33 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                     delegate: SliverChildListDelegate([
                       const SizedBox(height: 10),
                       // ── Menu icon — navigates to Settings full page ────
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.end,
-                        children: [
-                          GestureDetector(
-                            onTap: () {
-                              HapticFeedback.lightImpact();
-                              context.push('/settings');
-                            },
-                            child: Icon(
+                      GestureDetector(
+                        behavior: HitTestBehavior.opaque,
+                        onTap: () {
+                          HapticFeedback.lightImpact();
+                          context.push('/settings');
+                        },
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.end,
+                          children: [
+                            Text(
+                              'Settings',
+                              style: TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w600,
+                                color: isDark
+                                    ? Colors.white70
+                                    : Colors.black54,
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Icon(
                               Icons.menu_rounded,
                               size: 26,
                               color: isDark ? Colors.white70 : Colors.black54,
                             ),
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
                       const SizedBox(height: 16),
                       // ── Identity row ───────────────────────────────────
@@ -406,31 +419,35 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   }
 
   Widget _buildAvatar(AppColorScheme colors, String? avatarUrl) {
-    return Container(
-      width: 88,
-      height: 88,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        color: Colors.white,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.1),
-            blurRadius: 20,
-            offset: const Offset(0, 10),
-          ),
-        ],
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(4),
-        child: AppCachedImage(
-          imageUrl: avatarUrl,
-          width: 80,
-          height: 80,
-          borderRadius: BorderRadius.circular(50),
-          errorWidget: Container(
-            color: Colors.grey.shade300,
-            child: Icon(Icons.person,
-                size: 40, color: Colors.grey.shade600),
+    return GestureDetector(
+      onTap: () => showAvatarPopup(context, avatarUrl),
+      behavior: HitTestBehavior.opaque,
+      child: Container(
+        width: 88,
+        height: 88,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          color: Colors.white,
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.1),
+              blurRadius: 20,
+              offset: const Offset(0, 10),
+            ),
+          ],
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(4),
+          child: AppCachedImage(
+            imageUrl: avatarUrl,
+            width: 80,
+            height: 80,
+            borderRadius: BorderRadius.circular(50),
+            errorWidget: Container(
+              color: Colors.grey.shade300,
+              child: Icon(Icons.person,
+                  size: 40, color: Colors.grey.shade600),
+            ),
           ),
         ),
       ),

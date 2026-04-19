@@ -15,7 +15,9 @@ import '../../../core/providers/profile_providers.dart';
 import '../../../core/services/profile_service.dart';
 import '../../../core/app_theme.dart';
 import '../../../core/theme_provider.dart';
+import '../../../core/utils/avatar_cropper.dart';
 import '../../widgets/app_cached_image.dart';
+import '../../widgets/custom_avatar_picker.dart';
 
 class EditProfileScreen extends ConsumerStatefulWidget {
   const EditProfileScreen({super.key});
@@ -32,8 +34,16 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
   late final TextEditingController _phoneController;
   late final TextEditingController _locationController;
 
-  String _gender = 'Prefer not to say';
+  String? _gender;
   DateTime? _dateOfBirth;
+
+  static const _genderOptions = [
+    'Male',
+    'Female',
+    'Non-binary',
+    'Other',
+    'Prefer not to say',
+  ];
 
   // hobbyId → isPrimary
   final Map<int, bool> _selectedHobbies = {};
@@ -81,7 +91,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
       _bioController.text = profile.bio ?? '';
       _phoneController.text = profile.phone ?? '';
       _locationController.text = profile.location ?? '';
-      _gender = profile.gender ?? 'Prefer not to say';
+      _gender = profile.gender;
       _dateOfBirth = profile.dateOfBirth;
       _avatarUrl = profile.avatarUrl;
       _latitude = profile.latitude;
@@ -103,13 +113,19 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
     final picker = ImagePicker();
     final picked = await picker.pickImage(
       source: source,
-      maxWidth: 512,
-      maxHeight: 512,
-      imageQuality: 80,
+      maxWidth: 1536,
+      maxHeight: 1536,
+      imageQuality: 95,
     );
     if (picked == null) return;
 
-    final file = File(picked.path);
+    final colors = ref.read(appColorSchemeProvider);
+    final file = await cropAvatar(
+      sourcePath: picked.path,
+      toolbarColor: colors.primary,
+      activeControlsWidgetColor: colors.primary,
+    );
+    if (file == null || !mounted) return;
 
     // Show local file immediately as preview
     setState(() {
@@ -130,6 +146,31 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Failed to upload: $e')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _avatarUploading = false);
+    }
+  }
+
+  Future<void> _setCustomAvatar(String url) async {
+    final userId = ref.read(currentUserIdProvider);
+    if (userId == null) return;
+    setState(() => _avatarUploading = true);
+    try {
+      await ProfileService(ref.read(supabaseProvider))
+          .updateProfile(userId, {'avatar_url': url});
+      if (!mounted) return;
+      setState(() {
+        _avatarUrl = url;
+        _localAvatarFile = null;
+      });
+      ref.invalidate(fullProfileProvider);
+      ref.invalidate(currentProfileProvider);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to set avatar: $e')),
         );
       }
     } finally {
@@ -216,6 +257,20 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                     _pickAvatar(ImageSource.camera);
                   },
                 ),
+                const SizedBox(height: 8),
+                _avatarOptionTile(
+                  icon: Icons.face_retouching_natural_rounded,
+                  label: 'Pick a Custom Avatar',
+                  color: colors.primary,
+                  isDark: isDark,
+                  onTap: () {
+                    Navigator.pop(context);
+                    showCustomAvatarPicker(
+                      context,
+                      onPicked: _setCustomAvatar,
+                    );
+                  },
+                ),
                 if (_avatarUrl != null && _avatarUrl!.isNotEmpty) ...[
                   const SizedBox(height: 8),
                   _avatarOptionTile(
@@ -300,7 +355,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
             : _locationController.text.trim(),
         'latitude': _latitude,
         'longitude': _longitude,
-        'gender': _gender == 'Prefer not to say' ? null : _gender,
+        'gender': _gender,
         'date_of_birth': _dateOfBirth?.toIso8601String().split('T').first,
       });
 
@@ -660,52 +715,64 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
 
           const SizedBox(height: 10),
 
-          // ── Phone + Gender row ─────────────────────────────
-          Row(
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _label('Phone', isDark),
-                    const SizedBox(height: 4),
-                    TextFormField(
-                      controller: _phoneController,
-                      decoration: inputDeco.copyWith(hintText: 'Phone'),
-                      style: _inputTextStyle(isDark),
-                      keyboardType: TextInputType.phone,
+          // ── Phone ──────────────────────────────────────────
+          _label('Phone', isDark),
+          const SizedBox(height: 4),
+          TextFormField(
+            controller: _phoneController,
+            decoration: inputDeco.copyWith(hintText: 'Phone'),
+            style: _inputTextStyle(isDark),
+            keyboardType: TextInputType.phone,
+          ),
+
+          const SizedBox(height: 14),
+
+          // ── Gender ─────────────────────────────────────────
+          _label('Gender', isDark),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: _genderOptions.map((g) {
+              final selected = _gender == g;
+              return GestureDetector(
+                onTap: () {
+                  HapticFeedback.lightImpact();
+                  setState(() => _gender = selected ? null : g);
+                },
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 180),
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 14, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: selected
+                        ? colors.primary.withValues(alpha: 0.13)
+                        : (isDark
+                            ? Colors.white.withValues(alpha: 0.06)
+                            : Colors.white),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(
+                      color: selected
+                          ? colors.primary
+                          : (isDark
+                              ? Colors.white.withValues(alpha: 0.1)
+                              : Colors.black.withValues(alpha: 0.08)),
+                      width: selected ? 1.5 : 1,
                     ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _label('Gender', isDark),
-                    const SizedBox(height: 4),
-                    DropdownButtonFormField<String>(
-                      value: _gender,
-                      decoration: inputDeco,
-                      dropdownColor: isDark ? AppColors.darkSurface : Colors.white,
-                      style: _inputTextStyle(isDark),
-                      isExpanded: true,
-                      items: const [
-                        DropdownMenuItem(value: 'Male', child: Text('Male')),
-                        DropdownMenuItem(value: 'Female', child: Text('Female')),
-                        DropdownMenuItem(value: 'Other', child: Text('Other')),
-                        DropdownMenuItem(
-                            value: 'Prefer not to say', child: Text('Prefer not to say')),
-                      ],
-                      onChanged: (v) {
-                        if (v != null) setState(() => _gender = v);
-                      },
+                  ),
+                  child: Text(
+                    g,
+                    style: TextStyle(
+                      fontWeight: FontWeight.w600,
+                      fontSize: 13,
+                      color: selected
+                          ? colors.primary
+                          : (isDark ? Colors.white70 : Colors.black54),
                     ),
-                  ],
+                  ),
                 ),
-              ),
-            ],
+              );
+            }).toList(),
           ),
 
           const SizedBox(height: 14),

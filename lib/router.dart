@@ -22,6 +22,8 @@ import 'ui/screens/profile/edit_profile_screen.dart';
 import 'ui/screens/messages/message_requests_screen.dart';
 import 'ui/screens/messages/new_chat_screen.dart';
 import 'ui/screens/notifications/notifications_screen.dart';
+import 'ui/screens/settings/delete_account_screen.dart';
+import 'ui/screens/settings/notifications_settings_screen.dart';
 import 'ui/screens/settings/settings_screen.dart';
 import 'ui/screens/explore/nearby_talents_screen.dart';
 import 'ui/screens/explore/top_creators_screen.dart';
@@ -94,7 +96,7 @@ final routerProvider = Provider<GoRouter>((ref) {
 
       // ── Authenticated, has profile ───────────────────────────────────────
       if (profileExists == true) {
-        if (loc == '/auth' || loc == '/complete-profile') return '/';
+        if (loc == '/auth') return '/';
       }
 
       return null;
@@ -172,6 +174,14 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/theme-selector',
         builder: (context, state) => const ThemeSelectorScreen(),
+      ),
+      GoRoute(
+        path: '/delete-account',
+        builder: (context, state) => const DeleteAccountScreen(),
+      ),
+      GoRoute(
+        path: '/notifications-settings',
+        builder: (context, state) => const NotificationsSettingsScreen(),
       ),
       GoRoute(
         path: '/blocked-users',

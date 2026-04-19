@@ -8,6 +8,7 @@ import '../../core/app_theme.dart';
 import '../../core/providers/navigation_providers.dart';
 import '../../core/providers/wave_providers.dart';
 import '../../core/theme_provider.dart';
+import '../widgets/app_drawer.dart';
 import '../widgets/profile_completion_banner.dart';
 import 'explore/explore_screen.dart';
 import 'explore/search_screen.dart';
@@ -71,6 +72,8 @@ class _MainScreenState extends ConsumerState<MainScreen> {
         }
       },
       child: Scaffold(
+      key: ref.watch(mainScaffoldKeyProvider),
+      drawer: const AppDrawer(),
       body: Stack(
         children: [
           IndexedStack(index: currentIndex, children: _screens),

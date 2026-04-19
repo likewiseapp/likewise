@@ -79,4 +79,36 @@ class NotificationService {
         .eq('actor_id', actorId)
         .eq('type', 'follow');
   }
+
+  /// Fetches the user's notification preferences row. Lazy-creates a default
+  /// row (all toggles on) on first call.
+  Future<Map<String, dynamic>> getPreferences(String userId) async {
+    final existing = await _client
+        .from('notification_preferences')
+        .select()
+        .eq('user_id', userId)
+        .maybeSingle();
+
+    if (existing != null) return existing;
+
+    final created = await _client
+        .from('notification_preferences')
+        .insert({'user_id': userId})
+        .select()
+        .single();
+    return created;
+  }
+
+  /// Upserts a single preference field for the user.
+  Future<void> updatePreference({
+    required String userId,
+    required String field,
+    required bool value,
+  }) async {
+    await _client.from('notification_preferences').upsert({
+      'user_id': userId,
+      field: value,
+      'updated_at': DateTime.now().toIso8601String(),
+    });
+  }
 }

@@ -21,6 +21,7 @@ import '../../../core/services/report_service.dart';
 import '../../../core/app_theme.dart';
 import '../../../core/theme_provider.dart';
 import '../../widgets/app_cached_image.dart';
+import '../../widgets/avatar_popup.dart';
 
 class UserProfileScreen extends ConsumerStatefulWidget {
   final String userId;
@@ -412,45 +413,52 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
                               color: isDark ? Colors.white24 : Colors.black26),
                         )
                       else
-                        Container(
-                          padding: const EdgeInsets.all(3),
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            gradient: LinearGradient(
-                              begin: Alignment.topLeft,
-                              end: Alignment.bottomRight,
-                              colors: [colors.primary, colors.accent],
-                            ),
-                            boxShadow: [
-                              BoxShadow(
-                                color: colors.primary.withValues(alpha: 0.3),
-                                blurRadius: 20,
-                                offset: const Offset(0, 8),
-                              ),
-                            ],
-                          ),
+                        GestureDetector(
+                          onTap: () =>
+                              showAvatarPopup(context, profile.avatarUrl),
+                          behavior: HitTestBehavior.opaque,
                           child: Container(
                             padding: const EdgeInsets.all(3),
                             decoration: BoxDecoration(
                               shape: BoxShape.circle,
-                              color: isDark
-                                  ? AppColors.darkScaffold
-                                  : AppColors.lightScaffold,
+                              gradient: LinearGradient(
+                                begin: Alignment.topLeft,
+                                end: Alignment.bottomRight,
+                                colors: [colors.primary, colors.accent],
+                              ),
+                              boxShadow: [
+                                BoxShadow(
+                                  color:
+                                      colors.primary.withValues(alpha: 0.3),
+                                  blurRadius: 20,
+                                  offset: const Offset(0, 8),
+                                ),
+                              ],
                             ),
-                            child: AppCachedImage(
-                              imageUrl: profile.avatarUrl,
-                              width: 88,
-                              height: 88,
-                              borderRadius: BorderRadius.circular(50),
-                              errorWidget: Container(
+                            child: Container(
+                              padding: const EdgeInsets.all(3),
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                color: isDark
+                                    ? AppColors.darkScaffold
+                                    : AppColors.lightScaffold,
+                              ),
+                              child: AppCachedImage(
+                                imageUrl: profile.avatarUrl,
                                 width: 88,
                                 height: 88,
-                                decoration: BoxDecoration(
-                                  shape: BoxShape.circle,
-                                  color: Colors.grey.shade300,
+                                borderRadius: BorderRadius.circular(50),
+                                errorWidget: Container(
+                                  width: 88,
+                                  height: 88,
+                                  decoration: BoxDecoration(
+                                    shape: BoxShape.circle,
+                                    color: Colors.grey.shade300,
+                                  ),
+                                  child: Icon(Icons.person,
+                                      size: 44,
+                                      color: Colors.grey.shade600),
                                 ),
-                                child: Icon(Icons.person,
-                                    size: 44, color: Colors.grey.shade600),
                               ),
                             ),
                           ),

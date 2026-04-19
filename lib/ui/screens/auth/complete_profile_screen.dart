@@ -7,12 +7,19 @@ import 'package:geocoding/geocoding.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:image_picker/image_picker.dart';
 
+import 'package:go_router/go_router.dart';
+
 import '../../../core/app_theme.dart';
+import '../../../core/bunny_config.dart';
 import '../../../core/models/hobby.dart';
 import '../../../core/providers/auth_providers.dart';
 import '../../../core/providers/hobby_providers.dart';
+import '../../../core/providers/profile_providers.dart';
 import '../../../core/services/profile_service.dart';
 import '../../../core/theme_provider.dart';
+import '../../../core/utils/avatar_cropper.dart';
+import '../../widgets/app_cached_image.dart';
+import '../../widgets/custom_avatar_picker.dart';
 
 class CompleteProfileScreen extends ConsumerStatefulWidget {
   const CompleteProfileScreen({super.key});
@@ -36,6 +43,8 @@ class _CompleteProfileScreenState extends ConsumerState<CompleteProfileScreen> {
 
   // Step 1 — Photo & Bio
   File? _avatarFile;
+  String? _pickedAvatarUrl; // chosen from custom avatar picker
+  String? _existingAvatarUrl; // the avatar currently in DB (edit mode)
   final _bioController = TextEditingController();
 
   // Step 2 — About You
@@ -56,6 +65,54 @@ class _CompleteProfileScreenState extends ConsumerState<CompleteProfileScreen> {
   bool _loading = false;
   String? _error;
 
+  // True when opened from an existing profile (to update/complete it) rather
+  // than during first-time registration. Controls UPSERT semantics and how
+  // we exit the flow after submit.
+  bool _editMode = false;
+  String? _existingUsername;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _preloadProfile());
+  }
+
+  Future<void> _preloadProfile() async {
+    final userId = ref.read(currentUserIdProvider);
+    if (userId == null) return;
+    final client = ref.read(supabaseProvider);
+    final profileService = ProfileService(client);
+
+    final profile = await profileService.fetchProfile(userId);
+    if (profile == null || !mounted) return;
+
+    final hobbies = await profileService.fetchUserHobbies(userId);
+    if (!mounted) return;
+
+    setState(() {
+      _editMode = true;
+      _existingUsername = profile.username;
+      _nameController.text = profile.fullName;
+      _usernameController.text = profile.username;
+      _usernameAvailable = true;
+      _bioController.text = profile.bio ?? '';
+      _selectedGender = profile.gender;
+      _dateOfBirth = profile.dateOfBirth;
+      _locationController.text = profile.location ?? '';
+      _latitude = profile.latitude;
+      _longitude = profile.longitude;
+      _existingAvatarUrl = profile.avatarUrl;
+      if (CustomAvatars.isCustom(profile.avatarUrl)) {
+        _pickedAvatarUrl = profile.avatarUrl;
+      }
+      _selectedHobbyIds
+        ..clear()
+        ..addAll(hobbies.map((h) => h.hobbyId));
+      final primary = hobbies.where((h) => h.isPrimary).firstOrNull;
+      _primaryHobbyId = primary?.hobbyId;
+    });
+  }
+
   @override
   void dispose() {
     _usernameDebounce?.cancel();
@@ -75,6 +132,14 @@ class _CompleteProfileScreenState extends ConsumerState<CompleteProfileScreen> {
     if (trimmed.isEmpty) {
       setState(() {
         _usernameAvailable = null;
+        _checkingUsername = false;
+      });
+      return;
+    }
+    if (_existingUsername != null &&
+        trimmed.toLowerCase() == _existingUsername!.toLowerCase()) {
+      setState(() {
+        _usernameAvailable = true;
         _checkingUsername = false;
       });
       return;
@@ -152,13 +217,24 @@ class _CompleteProfileScreenState extends ConsumerState<CompleteProfileScreen> {
   Future<void> _pickAvatar() async {
     final xFile = await ImagePicker().pickImage(
       source: ImageSource.gallery,
-      maxWidth: 1024,
-      maxHeight: 1024,
-      imageQuality: 85,
+      maxWidth: 1536,
+      maxHeight: 1536,
+      imageQuality: 95,
     );
-    if (xFile != null && mounted) {
-      setState(() => _avatarFile = File(xFile.path));
-    }
+    if (xFile == null || !mounted) return;
+
+    final colors = ref.read(appColorSchemeProvider);
+    final file = await cropAvatar(
+      sourcePath: xFile.path,
+      toolbarColor: colors.primary,
+      activeControlsWidgetColor: colors.primary,
+    );
+    if (file == null || !mounted) return;
+
+    setState(() {
+      _avatarFile = file;
+      _pickedAvatarUrl = null; // file takes precedence
+    });
   }
 
   // ── Location detection ────────────────────────────────────────────────────
@@ -222,32 +298,52 @@ class _CompleteProfileScreenState extends ConsumerState<CompleteProfileScreen> {
       final userId = ref.read(currentUserIdProvider)!;
       final profileService = ProfileService(ref.read(supabaseProvider));
 
-      // 1. Create the profile row
+      // 1. Create or update the profile row (upsert either way)
       await ref.read(authServiceProvider).createProfile(
             username: _usernameController.text.trim().toLowerCase(),
             fullName: _nameController.text.trim(),
           );
 
-      // 2. Optional fields
+      // 2. Optional fields — in edit mode, also clear fields the user emptied
       final optionals = <String, dynamic>{};
       final bio = _bioController.text.trim();
-      if (bio.isNotEmpty) optionals['bio'] = bio;
-      if (_selectedGender != null) optionals['gender'] = _selectedGender;
+      if (bio.isNotEmpty) {
+        optionals['bio'] = bio;
+      } else if (_editMode) {
+        optionals['bio'] = null;
+      }
+      if (_selectedGender != null) {
+        optionals['gender'] = _selectedGender;
+      } else if (_editMode) {
+        optionals['gender'] = null;
+      }
       if (_dateOfBirth != null) {
         optionals['date_of_birth'] =
             _dateOfBirth!.toIso8601String().split('T').first;
+      } else if (_editMode) {
+        optionals['date_of_birth'] = null;
       }
       final loc = _locationController.text.trim();
-      if (loc.isNotEmpty) optionals['location'] = loc;
+      if (loc.isNotEmpty) {
+        optionals['location'] = loc;
+      } else if (_editMode) {
+        optionals['location'] = null;
+      }
       if (_latitude != null) optionals['latitude'] = _latitude;
       if (_longitude != null) optionals['longitude'] = _longitude;
       if (optionals.isNotEmpty) {
         await profileService.updateProfile(userId, optionals);
       }
 
-      // 3. Avatar
+      // 3. Avatar — file upload wins over custom-avatar pick
       if (_avatarFile != null) {
         await profileService.uploadAvatar(userId, _avatarFile!);
+      } else if (_pickedAvatarUrl != null &&
+          _pickedAvatarUrl != _existingAvatarUrl) {
+        await profileService.updateProfile(
+          userId,
+          {'avatar_url': _pickedAvatarUrl},
+        );
       }
 
       // 4. Hobbies
@@ -258,10 +354,24 @@ class _CompleteProfileScreenState extends ConsumerState<CompleteProfileScreen> {
               .map((id) => (hobbyId: id, isPrimary: id == _primaryHobbyId))
               .toList(),
         );
+      } else if (_editMode) {
+        await profileService.updateUserHobbies(userId, []);
       }
 
-      if (mounted) {
+      if (!mounted) return;
+      if (_editMode) {
+        // Refresh every place that renders the avatar / profile.
+        ref.invalidate(fullProfileProvider);
+        ref.invalidate(currentProfileProvider);
+        ref.invalidate(userHobbiesProvider(userId));
+        if (context.canPop()) {
+          context.pop();
+        } else {
+          context.go('/');
+        }
+      } else {
         ref.read(profileExistsNotifierProvider.notifier).markCreated();
+        if (mounted) context.go('/');
       }
     } catch (e) {
       if (mounted) setState(() => _error = e.toString());
@@ -559,11 +669,21 @@ class _CompleteProfileScreenState extends ConsumerState<CompleteProfileScreen> {
                             child:
                                 Image.file(_avatarFile!, fit: BoxFit.cover),
                           )
-                        : Icon(
-                            Icons.person_rounded,
-                            size: 52,
-                            color: colors.primary.withValues(alpha: 0.5),
-                          ),
+                        : (_pickedAvatarUrl ?? _existingAvatarUrl) != null
+                            ? ClipOval(
+                                child: AppCachedImage(
+                                  imageUrl:
+                                      _pickedAvatarUrl ?? _existingAvatarUrl,
+                                  width: 110,
+                                  height: 110,
+                                  fit: BoxFit.cover,
+                                ),
+                              )
+                            : Icon(
+                                Icons.person_rounded,
+                                size: 52,
+                                color: colors.primary.withValues(alpha: 0.5),
+                              ),
                   ),
                   Positioned(
                     bottom: 0,
@@ -605,8 +725,46 @@ class _CompleteProfileScreenState extends ConsumerState<CompleteProfileScreen> {
               ),
             ),
           ),
+          const SizedBox(height: 8),
+          Center(
+            child: GestureDetector(
+              onTap: _loading
+                  ? null
+                  : () => showCustomAvatarPicker(
+                        context,
+                        onPicked: (url) {
+                          setState(() {
+                            _pickedAvatarUrl = url;
+                            _avatarFile = null;
+                          });
+                        },
+                      ),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 4),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      Icons.face_retouching_natural_rounded,
+                      size: 15,
+                      color: colors.primary,
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      'Or pick a custom avatar',
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: colors.primary,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
 
-          const SizedBox(height: 28),
+          const SizedBox(height: 24),
           _label('Bio', isDark),
           const SizedBox(height: 8),
           Container(

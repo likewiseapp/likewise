@@ -8,6 +8,7 @@ import '../../core/providers/navigation_providers.dart';
 import '../../core/providers/profile_providers.dart';
 import '../../core/app_theme.dart';
 import '../../core/theme_provider.dart';
+import '../screens/settings/report_problem_sheet.dart';
 import 'app_cached_image.dart';
 
 class AppDrawer extends ConsumerWidget {
@@ -222,11 +223,14 @@ class AppDrawer extends ConsumerWidget {
                       },
                     ),
                     _NavItem(
-                      icon: Icons.help_outline_rounded,
-                      label: 'Help & Support',
+                      icon: Icons.flag_outlined,
+                      label: 'Report a Problem',
                       colors: colors,
                       isDark: isDark,
-                      onTap: () => Navigator.of(context).pop(),
+                      onTap: () {
+                        Navigator.of(context).pop();
+                        showReportProblemSheet(context);
+                      },
                     ),
                   ],
                 ),
