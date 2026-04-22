@@ -3,6 +3,8 @@ import 'dart:io';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../models/wave.dart';
+import '../models/wave_comment.dart';
+import '../services/wave_engagement_service.dart';
 import '../services/wave_service.dart';
 import 'auth_providers.dart';
 
@@ -36,6 +38,97 @@ class _UploadProgressNotifier extends Notifier<double> {
 final wavesProvider = FutureProvider<List<Wave>>((ref) async {
   final client = ref.watch(supabaseProvider);
   return WaveService(client).fetchWaves();
+});
+
+/// Approved + transcoding-ready waves for a specific user, newest first.
+/// Used by the profile screen's "My waves" section and (later) other
+/// users' profiles.
+final userWavesProvider =
+    FutureProvider.family<List<Wave>, String>((ref, userId) async {
+  final client = ref.watch(supabaseProvider);
+  return WaveService(client).fetchWavesByUser(userId);
+});
+
+final waveEngagementServiceProvider = Provider<WaveEngagementService>((ref) {
+  return WaveEngagementService(ref.watch(supabaseProvider));
+});
+
+/// Per-wave like state, stored in a single map and narrow-watched via
+/// `.select` in the UI to avoid unrelated rebuilds.
+class WaveLikeState {
+  final bool liked;
+  final int count;
+
+  const WaveLikeState({required this.liked, required this.count});
+}
+
+class WaveLikesNotifier extends Notifier<Map<String, WaveLikeState>> {
+  @override
+  Map<String, WaveLikeState> build() => const {};
+
+  WaveLikeState stateFor(String waveId) =>
+      state[waveId] ?? const WaveLikeState(liked: false, count: 0);
+
+  /// Hydrate from the server-side [Wave]. No-op when values already match.
+  void seedFrom(Wave wave) {
+    final current = state[wave.id];
+    if (current != null &&
+        current.liked == wave.viewerLiked &&
+        current.count == wave.likeCount) {
+      return;
+    }
+    state = {
+      ...state,
+      wave.id: WaveLikeState(liked: wave.viewerLiked, count: wave.likeCount),
+    };
+  }
+
+  /// Optimistically toggle, call the service, roll back on failure.
+  Future<void> toggle(String waveId) async {
+    final prev = stateFor(waveId);
+    final next = WaveLikeState(
+      liked: !prev.liked,
+      count: prev.liked
+          ? (prev.count - 1).clamp(0, 1 << 31)
+          : prev.count + 1,
+    );
+    state = {...state, waveId: next};
+
+    try {
+      await ref.read(waveEngagementServiceProvider).toggleLike(
+            waveId,
+            currentlyLiked: prev.liked,
+          );
+    } catch (_) {
+      state = {...state, waveId: prev};
+      rethrow;
+    }
+  }
+}
+
+final waveLikesProvider =
+    NotifierProvider<WaveLikesNotifier, Map<String, WaveLikeState>>(
+  WaveLikesNotifier.new,
+);
+
+/// Newest-first list of comments for a wave, refreshed whenever the
+/// realtime stream on wave_comments fires for that wave. We use the stream
+/// as a change-notifier only — the actual fetch goes through the service so
+/// author profiles get merged in (the stream itself can't embed profiles).
+final waveCommentsProvider =
+    StreamProvider.family<List<WaveComment>, String>((ref, waveId) async* {
+  final client = ref.watch(supabaseProvider);
+  final service = ref.watch(waveEngagementServiceProvider);
+
+  yield await service.fetchComments(waveId);
+
+  await for (final _ in client
+      .from('wave_comments')
+      .stream(primaryKey: ['id'])
+      .eq('wave_id', waveId)
+      .skip(1)) {
+    yield await service.fetchComments(waveId);
+  }
 });
 
 class WaveUploadNotifier extends Notifier<AsyncValue<void>> {

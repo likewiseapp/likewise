@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
@@ -9,6 +10,7 @@ import '../../../core/providers/navigation_providers.dart';
 import '../../../core/providers/wave_providers.dart';
 import '../../../core/theme_provider.dart';
 import '../../widgets/app_cached_image.dart';
+import '../../widgets/wave_comments_sheet.dart';
 import 'wave_player_manager.dart';
 
 class WavesScreen extends ConsumerStatefulWidget {
@@ -337,14 +339,44 @@ class _WaveItem extends ConsumerStatefulWidget {
   ConsumerState<_WaveItem> createState() => _WaveItemState();
 }
 
+// Module-level — persists across item rebuilds so bumping is dedup'd per
+// session without needing a shared-prefs round-trip.
+final _bumpedWaveIds = <String>{};
+
 class _WaveItemState extends ConsumerState<_WaveItem> {
   bool _showControls = false;
+  bool _captionExpanded = false;
   String _selectedQualityLabel = 'Auto';
 
   @override
   void initState() {
     super.initState();
     _loadSavedQuality();
+    // Seed the per-wave like state so the heart + count show correctly on
+    // first frame. Post-frame because providers can't be written during init.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      ref.read(waveLikesProvider.notifier).seedFrom(widget.wave);
+    });
+  }
+
+  Future<void> _toggleLike() async {
+    HapticFeedback.selectionClick();
+    try {
+      await ref.read(waveLikesProvider.notifier).toggle(widget.wave.id);
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Could not like — try again'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
+  }
+
+  void _openComments() {
+    showWaveCommentsSheet(context, waveId: widget.wave.id);
   }
 
   Future<void> _loadSavedQuality() async {
@@ -387,6 +419,20 @@ class _WaveItemState extends ConsumerState<_WaveItem> {
     final colors = ref.watch(appColorSchemeProvider);
     final ctrl = widget.controller;
     final isReady = ctrl != null && ctrl.value.isInitialized;
+
+    // Bump view count once per session per wave, the first time this item is
+    // active. Safe from double-bumps thanks to the module-level Set.
+    if (widget.isActive && _bumpedWaveIds.add(widget.wave.id)) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        ref
+            .read(waveEngagementServiceProvider)
+            .bumpView(widget.wave.id)
+            .catchError((_) {
+          // Silent failure — view bumps aren't user-critical.
+          _bumpedWaveIds.remove(widget.wave.id);
+        });
+      });
+    }
 
     return GestureDetector(
       onTap: _toggleControls,
@@ -505,44 +551,161 @@ class _WaveItemState extends ConsumerState<_WaveItem> {
               ),
             ),
 
-          // ── Bottom info ────────────────────────────────────────────────
+          // ── View count badge (top-right) ───────────────────────────────
+          Positioned(
+            top: 16 + MediaQuery.of(context).padding.top,
+            right: 14,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+              decoration: BoxDecoration(
+                color: Colors.black.withValues(alpha: 0.35),
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(
+                  color: Colors.white.withValues(alpha: 0.15),
+                ),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(
+                    Icons.visibility_rounded,
+                    size: 13,
+                    color: Colors.white,
+                  ),
+                  const SizedBox(width: 5),
+                  Text(
+                    _formatWaveCount(widget.wave.viewCount),
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+
+          // ── Bottom info: avatar + username + caption ───────────────────
           Positioned(
             left: 16,
-            right: 16,
+            right: 84,
             bottom: 100,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
               children: [
-                if (widget.wave.caption.isNotEmpty)
-                  Text(
-                    widget.wave.caption,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 15,
-                      fontWeight: FontWeight.w500,
-                      height: 1.4,
-                      shadows: [Shadow(color: Colors.black54, blurRadius: 6)],
+                Row(
+                  children: [
+                    Container(
+                      width: 42,
+                      height: 42,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: Colors.white.withValues(alpha: 0.5),
+                          width: 1.5,
+                        ),
+                      ),
+                      child: ClipOval(
+                        child: AppCachedImage(
+                          imageUrl: widget.wave.avatarUrl,
+                          fit: BoxFit.cover,
+                          errorWidget: Container(
+                            color: Colors.white.withValues(alpha: 0.15),
+                            child: const Icon(
+                              Icons.person_rounded,
+                              color: Colors.white,
+                              size: 22,
+                            ),
+                          ),
+                        ),
+                      ),
                     ),
-                    maxLines: 3,
-                    overflow: TextOverflow.ellipsis,
+                    const SizedBox(width: 10),
+                    Flexible(
+                      child: Text(
+                        widget.wave.username != null
+                            ? '@${widget.wave.username}'
+                            : (widget.wave.fullName ?? 'Unknown'),
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 15,
+                          fontWeight: FontWeight.w700,
+                          shadows: [
+                            Shadow(color: Colors.black54, blurRadius: 4),
+                          ],
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
+                ),
+                if (widget.wave.caption.isNotEmpty) ...[
+                  const SizedBox(height: 10),
+                  GestureDetector(
+                    behavior: HitTestBehavior.opaque,
+                    onTap: () => setState(
+                        () => _captionExpanded = !_captionExpanded),
+                    child: Text(
+                      widget.wave.caption,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w500,
+                        height: 1.35,
+                        shadows: [
+                          Shadow(color: Colors.black54, blurRadius: 6),
+                        ],
+                      ),
+                      maxLines: _captionExpanded ? 8 : 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
                   ),
+                ],
               ],
             ),
           ),
 
           // ── Right action buttons ───────────────────────────────────────
           Positioned(
-            right: 12,
+            right: 10,
             bottom: 120,
             child: Column(
               children: [
-                _ActionBtn(icon: Icons.favorite_rounded, colors: colors),
-                const SizedBox(height: 20),
-                _ActionBtn(icon: Icons.chat_bubble_rounded, colors: colors),
-                const SizedBox(height: 20),
-                _ActionBtn(icon: Icons.share_rounded, colors: colors),
-                const SizedBox(height: 20),
+                // Like — watches the per-wave like state via select for
+                // narrow rebuilds and animates the heart on toggle.
+                Consumer(
+                  builder: (context, ref, _) {
+                    final liked = ref.watch(waveLikesProvider
+                        .select((m) => m[widget.wave.id]?.liked ?? false));
+                    final count = ref.watch(waveLikesProvider
+                        .select((m) =>
+                            m[widget.wave.id]?.count ?? widget.wave.likeCount));
+                    return _ActionBtn(
+                      icon: liked
+                          ? Icons.favorite_rounded
+                          : Icons.favorite_border_rounded,
+                      count: count,
+                      filled: liked,
+                      filledColor: const Color(0xFFFF3B5C),
+                      onTap: _toggleLike,
+                    );
+                  },
+                ),
+                const SizedBox(height: 16),
+                _ActionBtn(
+                  icon: Icons.mode_comment_outlined,
+                  count: widget.wave.commentCount,
+                  onTap: _openComments,
+                ),
+                const SizedBox(height: 16),
+                _ActionBtn(
+                  icon: Icons.share_rounded,
+                  onTap: () {},
+                ),
+                const SizedBox(height: 16),
                 _QualityBtn(
                   label: _selectedQualityLabel,
                   colors: colors,
@@ -574,26 +737,78 @@ class _WaveItemState extends ConsumerState<_WaveItem> {
   }
 }
 
+String _formatWaveCount(int n) {
+  if (n < 1000) return n.toString();
+  final k = n / 1000;
+  if (k < 10) return '${k.toStringAsFixed(1)}k';
+  if (k < 1000) return '${k.toStringAsFixed(0)}k';
+  final m = n / 1000000;
+  return '${m.toStringAsFixed(1)}M';
+}
+
 class _ActionBtn extends StatelessWidget {
   final IconData icon;
-  final AppColorScheme colors;
+  final int? count;
+  final bool filled;
+  final Color? filledColor;
+  final VoidCallback? onTap;
 
-  const _ActionBtn({required this.icon, required this.colors});
+  const _ActionBtn({
+    required this.icon,
+    this.count,
+    this.filled = false,
+    this.filledColor,
+    this.onTap,
+  });
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: 46,
-      height: 46,
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.2),
-        shape: BoxShape.circle,
-        border: Border.all(
-          color: Colors.white.withValues(alpha: 0.3),
-          width: 1.5,
-        ),
+    final iconColor = filled ? (filledColor ?? Colors.white) : Colors.white;
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: onTap,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          AnimatedScale(
+            scale: filled ? 1.12 : 1.0,
+            duration: const Duration(milliseconds: 180),
+            curve: Curves.easeOutBack,
+            child: Container(
+              width: 46,
+              height: 46,
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.18),
+                shape: BoxShape.circle,
+                border: Border.all(
+                  color: Colors.white.withValues(alpha: 0.28),
+                  width: 1.2,
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.3),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+              ),
+              child: Icon(icon, color: iconColor, size: 22),
+            ),
+          ),
+          if (count != null) ...[
+            const SizedBox(height: 4),
+            Text(
+              _formatWaveCount(count!),
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 11.5,
+                fontWeight: FontWeight.w700,
+                shadows: [Shadow(color: Colors.black54, blurRadius: 4)],
+              ),
+            ),
+          ],
+        ],
       ),
-      child: Icon(icon, color: Colors.white, size: 22),
     );
   }
 }

@@ -1,11 +1,15 @@
+import 'dart:convert';
 import 'dart:io';
 import 'dart:ui';
 
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:go_router/go_router.dart';
 import 'package:http/http.dart' as http;
 import 'package:supabase_flutter/supabase_flutter.dart';
+
+import '../../router.dart';
 
 // ── Channels ──────────────────────────────────────────────────────────────
 // Defined at top-level so the background handler (separate isolate) can
@@ -136,7 +140,7 @@ Future<void> _showRichMessageNotification(
         visibility: NotificationVisibility.private,
       ),
     ),
-    payload: data.isEmpty ? null : data.toString(),
+    payload: data.isEmpty ? null : jsonEncode(data),
   );
 }
 
@@ -181,6 +185,7 @@ class PushNotificationService {
       const InitializationSettings(
         android: AndroidInitializationSettings('ic_notification'),
       ),
+      onDidReceiveNotificationResponse: _onLocalNotificationTap,
     );
 
     if (Platform.isAndroid) {
@@ -191,6 +196,16 @@ class PushNotificationService {
     }
 
     FirebaseMessaging.onMessage.listen(_onForegroundMessage);
+    // Covers iOS (where FCM-rendered notifications fire this on tap).
+    FirebaseMessaging.onMessageOpenedApp.listen((msg) {
+      _handleTap(msg.data);
+    });
+    // Cold-launched via a notification tap while the app was terminated.
+    final launchDetails = await _local.getNotificationAppLaunchDetails();
+    if (launchDetails?.didNotificationLaunchApp ?? false) {
+      final payload = launchDetails?.notificationResponse?.payload;
+      _handleTapPayload(payload);
+    }
     _fcm.onTokenRefresh.listen(_persistToken);
   }
 
@@ -235,4 +250,30 @@ class PushNotificationService {
 
   Future<void> _onForegroundMessage(RemoteMessage message) =>
       _showRichMessageNotification(_local, message);
+
+  void _onLocalNotificationTap(NotificationResponse response) {
+    _handleTapPayload(response.payload);
+  }
+
+  void _handleTapPayload(String? payload) {
+    if (payload == null || payload.isEmpty) return;
+    try {
+      final decoded = jsonDecode(payload);
+      if (decoded is Map<String, dynamic>) {
+        _handleTap(decoded);
+      }
+    } catch (_) {
+      // Legacy payloads from before the JSON switch used Map.toString() —
+      // not parseable, just fall through to generic behaviour below.
+      _handleTap(const {});
+    }
+  }
+
+  void _handleTap(Map<String, dynamic> data) {
+    final ctx = rootNavigatorKey.currentContext;
+    if (ctx == null) return;
+    if (data['type'] == 'message') {
+      ctx.go('/messages');
+    }
+  }
 }

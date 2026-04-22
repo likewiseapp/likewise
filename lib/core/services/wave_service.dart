@@ -13,14 +13,75 @@ class WaveService {
 
   WaveService(this._client);
 
-  Future<List<Wave>> fetchWaves() async {
-    final data = await _client
+  /// Approved + transcoding-ready waves for a specific user, newest first.
+  /// Used by profile screens (own profile = "My waves", others' profiles).
+  Future<List<Wave>> fetchWavesByUser(String userId) async {
+    final rows = await _client
         .from('waves')
-        .select()
+        .select(
+          'id, user_id, video_id, video_url, raw_video_url, thumbnail_url, '
+          'caption, created_at, status, transcoding_ready, approved_at, '
+          'view_count, like_count, comment_count',
+        )
+        .eq('user_id', userId)
         .eq('status', 'approved')
         .eq('transcoding_ready', true)
-        .order('created_at', ascending: false);
-    return (data as List).map((e) => Wave.fromJson(e)).toList();
+        .order('created_at', ascending: false) as List;
+
+    return rows
+        .map((r) => Wave.fromJson(r as Map<String, dynamic>))
+        .toList();
+  }
+
+  Future<List<Wave>> fetchWaves() async {
+    final viewerId = _client.auth.currentUser?.id;
+
+    // Step 1: fetch waves + viewer's own wave_likes rows (filtered embed).
+    // `waves.user_id` FKs to auth.users, not to public.profiles, so we can't
+    // nest the profile via PostgREST — profiles are fetched in step 2.
+    var query = _client.from('waves').select(
+          'id, user_id, video_id, video_url, raw_video_url, thumbnail_url, '
+          'caption, created_at, status, transcoding_ready, approved_at, '
+          'view_count, like_count, comment_count, '
+          'wave_likes (user_id)',
+        );
+
+    if (viewerId != null) {
+      query = query.eq('wave_likes.user_id', viewerId);
+    }
+
+    final rows = await query
+        .eq('status', 'approved')
+        .eq('transcoding_ready', true)
+        .order('created_at', ascending: false) as List;
+
+    if (rows.isEmpty) return [];
+
+    // Step 2: batch-fetch profiles for the poster user_ids.
+    final userIds = rows
+        .map((r) => r['user_id'] as String)
+        .toSet()
+        .toList();
+
+    final profileRows = await _client
+        .from('profiles')
+        .select('id, username, full_name, avatar_url')
+        .inFilter('id', userIds) as List;
+
+    final profileMap = {
+      for (final p in profileRows) p['id'] as String: p as Map<String, dynamic>,
+    };
+
+    // Step 3: merge the profile back into each row so Wave.fromJson can pick
+    // it up via the `profiles` key (matches the existing pattern used by
+    // message_service.dart).
+    return rows.map((row) {
+      final merged = <String, dynamic>{
+        ...row as Map<String, dynamic>,
+        'profiles': profileMap[row['user_id']],
+      };
+      return Wave.fromJson(merged);
+    }).toList();
   }
 
   Future<void> uploadWave(

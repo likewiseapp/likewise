@@ -54,11 +54,16 @@ class _AuthListenable extends ChangeNotifier {
   }
 }
 
+/// Root navigator key — exposed so non-widget code (notification tap handlers,
+/// deep link handlers) can navigate without needing a BuildContext.
+final rootNavigatorKey = GlobalKey<NavigatorState>();
+
 final routerProvider = Provider<GoRouter>((ref) {
   final notifier = _AuthListenable(ref);
   ref.onDispose(notifier.dispose);
 
   return GoRouter(
+    navigatorKey: rootNavigatorKey,
     initialLocation: '/splash',
     refreshListenable: notifier,
     redirect: (context, state) {

@@ -9,6 +9,7 @@ import '../../../core/models/hobby.dart';
 import '../../../core/providers/auth_providers.dart';
 import '../../../core/providers/hobby_providers.dart';
 import '../../../core/providers/profile_providers.dart';
+import '../../../core/providers/wave_providers.dart';
 import '../../../core/theme_provider.dart';
 import '../../widgets/app_cached_image.dart';
 import '../../widgets/avatar_popup.dart';
@@ -361,7 +362,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                   child: Padding(
                     padding: const EdgeInsets.fromLTRB(24, 20, 24, 12),
                     child: Text(
-                      'MY REELS',
+                      'MY WAVES',
                       style: TextStyle(
                         fontSize: 11,
                         fontWeight: FontWeight.w800,
@@ -372,62 +373,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                   ),
                 ),
 
-                SliverToBoxAdapter(
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 24),
-                    child: Container(
-                      height: 180,
-                      decoration: BoxDecoration(
-                        color: isDark
-                            ? Colors.white.withValues(alpha: 0.04)
-                            : Colors.black.withValues(alpha: 0.03),
-                        borderRadius: BorderRadius.circular(20),
-                        border: Border.all(
-                          color: isDark
-                              ? Colors.white.withValues(alpha: 0.07)
-                              : Colors.black.withValues(alpha: 0.06),
-                        ),
-                      ),
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Container(
-                            width: 56,
-                            height: 56,
-                            decoration: BoxDecoration(
-                              color: isDark
-                                  ? Colors.white.withValues(alpha: 0.07)
-                                  : Colors.black.withValues(alpha: 0.05),
-                              shape: BoxShape.circle,
-                            ),
-                            child: Icon(
-                              Icons.videocam_outlined,
-                              size: 26,
-                              color: Colors.grey.shade500,
-                            ),
-                          ),
-                          const SizedBox(height: 12),
-                          Text(
-                            'No reels yet',
-                            style: TextStyle(
-                              fontSize: 15,
-                              fontWeight: FontWeight.w700,
-                              color: isDark ? Colors.white70 : Colors.black54,
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            'Share your first video',
-                            style: TextStyle(
-                              fontSize: 13,
-                              color: Colors.grey.shade500,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
+                _MyWavesSection(userId: userId, isDark: isDark),
 
                 SliverToBoxAdapter(
                   child: SizedBox(
@@ -663,4 +609,209 @@ class _RetryWidget extends StatelessWidget {
       ),
     );
   }
+}
+
+// ── My Waves section ─────────────────────────────────────────────────────────
+
+class _MyWavesSection extends ConsumerWidget {
+  final String userId;
+  final bool isDark;
+
+  const _MyWavesSection({required this.userId, required this.isDark});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final wavesAsync = ref.watch(userWavesProvider(userId));
+
+    return wavesAsync.when(
+      loading: () => SliverToBoxAdapter(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 24),
+          child: Container(
+            height: 120,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: isDark
+                  ? Colors.white.withValues(alpha: 0.04)
+                  : Colors.black.withValues(alpha: 0.03),
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: const CircularProgressIndicator(strokeWidth: 2.5),
+          ),
+        ),
+      ),
+      error: (_, __) => SliverToBoxAdapter(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 24),
+          child: Container(
+            height: 120,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: isDark
+                  ? Colors.white.withValues(alpha: 0.04)
+                  : Colors.black.withValues(alpha: 0.03),
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: Text(
+              'Couldn\'t load your waves',
+              style: TextStyle(color: Colors.grey.shade500, fontSize: 13),
+            ),
+          ),
+        ),
+      ),
+      data: (waves) {
+        if (waves.isEmpty) {
+          return SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 24),
+              child: _MyWavesEmpty(isDark: isDark),
+            ),
+          );
+        }
+
+        return SliverPadding(
+          padding: const EdgeInsets.symmetric(horizontal: 24),
+          sliver: SliverGrid(
+            gridDelegate:
+                const SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 3,
+              mainAxisSpacing: 6,
+              crossAxisSpacing: 6,
+              childAspectRatio: 9 / 16,
+            ),
+            delegate: SliverChildBuilderDelegate(
+              (context, index) => _MyWaveTile(wave: waves[index]),
+              childCount: waves.length,
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _MyWavesEmpty extends StatelessWidget {
+  final bool isDark;
+  const _MyWavesEmpty({required this.isDark});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 180,
+      decoration: BoxDecoration(
+        color: isDark
+            ? Colors.white.withValues(alpha: 0.04)
+            : Colors.black.withValues(alpha: 0.03),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: isDark
+              ? Colors.white.withValues(alpha: 0.07)
+              : Colors.black.withValues(alpha: 0.06),
+        ),
+      ),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Container(
+            width: 56,
+            height: 56,
+            decoration: BoxDecoration(
+              color: isDark
+                  ? Colors.white.withValues(alpha: 0.07)
+                  : Colors.black.withValues(alpha: 0.05),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(
+              Icons.videocam_outlined,
+              size: 26,
+              color: Colors.grey.shade500,
+            ),
+          ),
+          const SizedBox(height: 12),
+          Text(
+            'No waves yet',
+            style: TextStyle(
+              fontSize: 15,
+              fontWeight: FontWeight.w700,
+              color: isDark ? Colors.white70 : Colors.black54,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'Share your first video',
+            style: TextStyle(
+              fontSize: 13,
+              color: Colors.grey.shade500,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _MyWaveTile extends StatelessWidget {
+  final dynamic wave;
+
+  const _MyWaveTile({required this.wave});
+
+  @override
+  Widget build(BuildContext context) {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(10),
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          AppCachedImage(
+            imageUrl: wave.thumbnailUrl,
+            fit: BoxFit.cover,
+            errorWidget: Container(
+              color: Colors.grey.shade900,
+              child: const Icon(Icons.videocam_outlined,
+                  color: Colors.white24),
+            ),
+          ),
+          // Bottom gradient for view count readability
+          const DecoratedBox(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [Colors.transparent, Colors.black54],
+                stops: [0.55, 1.0],
+              ),
+            ),
+          ),
+          Positioned(
+            left: 6,
+            bottom: 5,
+            child: Row(
+              children: [
+                const Icon(Icons.play_arrow_rounded,
+                    size: 14, color: Colors.white),
+                const SizedBox(width: 2),
+                Text(
+                  _compactCount(wave.viewCount as int),
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                    shadows: [Shadow(color: Colors.black54, blurRadius: 3)],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+String _compactCount(int n) {
+  if (n < 1000) return n.toString();
+  final k = n / 1000;
+  if (k < 10) return '${k.toStringAsFixed(1)}k';
+  if (k < 1000) return '${k.toStringAsFixed(0)}k';
+  return '${(n / 1000000).toStringAsFixed(1)}M';
 }
