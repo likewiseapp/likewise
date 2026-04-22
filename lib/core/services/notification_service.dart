@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../models/app_notification.dart';
@@ -7,11 +9,54 @@ class NotificationService {
 
   NotificationService(this._client);
 
+  /// Real-time stream of the user's notifications — re-fetches whenever a row
+  /// is inserted, updated, or deleted in `notifications` for this recipient.
+  Stream<List<AppNotification>> streamNotifications(String userId) {
+    late StreamController<List<AppNotification>> controller;
+    RealtimeChannel? channel;
+
+    Future<void> refetch() async {
+      try {
+        final list = await fetchNotifications(userId);
+        if (!controller.isClosed) controller.add(list);
+      } catch (e) {
+        if (!controller.isClosed) controller.addError(e);
+      }
+    }
+
+    controller = StreamController<List<AppNotification>>(
+      onListen: () {
+        refetch();
+        channel = _client
+            .channel('notifications_watch_$userId')
+            .onPostgresChanges(
+              event: PostgresChangeEvent.all,
+              schema: 'public',
+              table: 'notifications',
+              filter: PostgresChangeFilter(
+                type: PostgresChangeFilterType.eq,
+                column: 'recipient_id',
+                value: userId,
+              ),
+              callback: (_) => refetch(),
+            )
+            .subscribe();
+      },
+      onCancel: () {
+        channel?.unsubscribe();
+        controller.close();
+      },
+    );
+
+    return controller.stream;
+  }
+
   Future<List<AppNotification>> fetchNotifications(String userId) async {
     final data = await _client
         .from('notifications')
         .select()
         .eq('recipient_id', userId)
+        .neq('type', 'message')
         .order('created_at', ascending: false)
         .limit(50);
 

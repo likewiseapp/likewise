@@ -12,6 +12,18 @@ class HobbyService {
     return (data as List).map((e) => Hobby.fromJson(e)).toList();
   }
 
+  /// Returns a map of `hobbyId → user count` by aggregating `user_hobbies`.
+  /// Hobbies with zero users are omitted from the map.
+  Future<Map<int, int>> fetchHobbyCounts() async {
+    final data = await _client.from('user_hobbies').select('hobby_id');
+    final counts = <int, int>{};
+    for (final row in data as List) {
+      final id = row['hobby_id'] as int;
+      counts[id] = (counts[id] ?? 0) + 1;
+    }
+    return counts;
+  }
+
   /// Batch-fetch one representative hobby name per user in [userIds].
   /// Prefers the primary hobby; falls back to a random one if none is primary.
   /// Returns {userId: hobbyName}.

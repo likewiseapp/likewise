@@ -3,8 +3,6 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:geocoding/geocoding.dart';
-import 'package:geolocator/geolocator.dart';
 import 'package:image_picker/image_picker.dart';
 
 import 'package:go_router/go_router.dart';
@@ -32,7 +30,7 @@ class CompleteProfileScreen extends ConsumerStatefulWidget {
 class _CompleteProfileScreenState extends ConsumerState<CompleteProfileScreen> {
   final _pageController = PageController();
   int _step = 0;
-  static const _totalSteps = 5;
+  static const _totalSteps = 3;
 
   // Step 0 — Basic Info
   final _nameController = TextEditingController();
@@ -51,15 +49,18 @@ class _CompleteProfileScreenState extends ConsumerState<CompleteProfileScreen> {
   String? _selectedGender;
   DateTime? _dateOfBirth;
 
-  // Step 3 — Location
+  // Location (edit-mode only — populated from DB, written back on submit)
   final _locationController = TextEditingController();
   double? _latitude;
   double? _longitude;
-  bool _detectingLocation = false;
 
-  // Step 4 — Interests
+  // Step 4 — Interests (insertion-ordered — first = primary/main talent)
   final Set<int> _selectedHobbyIds = {};
-  int? _primaryHobbyId;
+  final _hobbySearchController = TextEditingController();
+  String _hobbyQuery = '';
+
+  int? get _primaryHobbyId =>
+      _selectedHobbyIds.isEmpty ? null : _selectedHobbyIds.first;
 
   // General
   bool _loading = false;
@@ -105,11 +106,14 @@ class _CompleteProfileScreenState extends ConsumerState<CompleteProfileScreen> {
       if (CustomAvatars.isCustom(profile.avatarUrl)) {
         _pickedAvatarUrl = profile.avatarUrl;
       }
-      _selectedHobbyIds
-        ..clear()
-        ..addAll(hobbies.map((h) => h.hobbyId));
+      _selectedHobbyIds.clear();
       final primary = hobbies.where((h) => h.isPrimary).firstOrNull;
-      _primaryHobbyId = primary?.hobbyId;
+      if (primary != null) _selectedHobbyIds.add(primary.hobbyId);
+      for (final h in hobbies) {
+        if (h.hobbyId != primary?.hobbyId) {
+          _selectedHobbyIds.add(h.hobbyId);
+        }
+      }
     });
   }
 
@@ -121,6 +125,7 @@ class _CompleteProfileScreenState extends ConsumerState<CompleteProfileScreen> {
     _usernameController.dispose();
     _bioController.dispose();
     _locationController.dispose();
+    _hobbySearchController.dispose();
     super.dispose();
   }
 
@@ -163,6 +168,7 @@ class _CompleteProfileScreenState extends ConsumerState<CompleteProfileScreen> {
   // ── Navigation ────────────────────────────────────────────────────────────
 
   void _goToStep(int step) {
+    FocusScope.of(context).unfocus();
     setState(() {
       _step = step;
       _error = null;
@@ -235,56 +241,6 @@ class _CompleteProfileScreenState extends ConsumerState<CompleteProfileScreen> {
       _avatarFile = file;
       _pickedAvatarUrl = null; // file takes precedence
     });
-  }
-
-  // ── Location detection ────────────────────────────────────────────────────
-
-  Future<void> _detectLocation() async {
-    setState(() {
-      _detectingLocation = true;
-      _error = null;
-    });
-    try {
-      if (!await Geolocator.isLocationServiceEnabled()) {
-        setState(() => _error = 'Location services are disabled.');
-        return;
-      }
-      LocationPermission permission = await Geolocator.checkPermission();
-      if (permission == LocationPermission.denied) {
-        permission = await Geolocator.requestPermission();
-      }
-      if (permission == LocationPermission.denied ||
-          permission == LocationPermission.deniedForever) {
-        setState(() => _error = 'Location permission denied.');
-        return;
-      }
-      final position = await Geolocator.getCurrentPosition(
-        locationSettings:
-            const LocationSettings(accuracy: LocationAccuracy.medium),
-      );
-      final placemarks = await placemarkFromCoordinates(
-        position.latitude,
-        position.longitude,
-      );
-      if (mounted) {
-        setState(() {
-          _latitude = position.latitude;
-          _longitude = position.longitude;
-          if (placemarks.isNotEmpty) {
-            final p = placemarks.first;
-            _locationController.text = [
-              p.locality,
-              p.administrativeArea,
-              p.country,
-            ].where((s) => s != null && s.isNotEmpty).join(', ');
-          }
-        });
-      }
-    } catch (_) {
-      if (mounted) setState(() => _error = 'Could not detect location.');
-    } finally {
-      if (mounted) setState(() => _detectingLocation = false);
-    }
   }
 
   // ── Submit ────────────────────────────────────────────────────────────────
@@ -395,7 +351,7 @@ class _CompleteProfileScreenState extends ConsumerState<CompleteProfileScreen> {
           children: [
             // ── Header & progress ────────────────────────────────────────
             Padding(
-              padding: const EdgeInsets.fromLTRB(24, 20, 24, 0),
+              padding: const EdgeInsets.fromLTRB(24, 14, 24, 0),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -407,17 +363,17 @@ class _CompleteProfileScreenState extends ConsumerState<CompleteProfileScreen> {
                         child: GestureDetector(
                           onTap: _step > 0 ? _back : null,
                           child: Container(
-                            width: 36,
-                            height: 36,
+                            width: 32,
+                            height: 32,
                             decoration: BoxDecoration(
                               color: isDark
                                   ? Colors.white.withValues(alpha: 0.08)
                                   : Colors.black.withValues(alpha: 0.05),
-                              borderRadius: BorderRadius.circular(10),
+                              borderRadius: BorderRadius.circular(9),
                             ),
                             child: Icon(
                               Icons.arrow_back_ios_new_rounded,
-                              size: 16,
+                              size: 14,
                               color: isDark ? Colors.white70 : Colors.black54,
                             ),
                           ),
@@ -427,26 +383,26 @@ class _CompleteProfileScreenState extends ConsumerState<CompleteProfileScreen> {
                       Text(
                         'Step ${_step + 1} of $_totalSteps',
                         style: TextStyle(
-                          fontSize: 13,
+                          fontSize: 12,
                           fontWeight: FontWeight.w600,
                           color: Colors.grey.shade500,
                         ),
                       ),
                     ],
                   ),
-                  const SizedBox(height: 14),
+                  const SizedBox(height: 10),
                   ClipRRect(
-                    borderRadius: BorderRadius.circular(4),
+                    borderRadius: BorderRadius.circular(3),
                     child: LinearProgressIndicator(
                       value: (_step + 1) / _totalSteps,
-                      minHeight: 4,
+                      minHeight: 3,
                       backgroundColor: isDark
                           ? Colors.white.withValues(alpha: 0.1)
                           : Colors.black.withValues(alpha: 0.07),
                       valueColor: AlwaysStoppedAnimation<Color>(colors.primary),
                     ),
                   ),
-                  const SizedBox(height: 24),
+                  const SizedBox(height: 16),
                 ],
               ),
             ),
@@ -460,24 +416,22 @@ class _CompleteProfileScreenState extends ConsumerState<CompleteProfileScreen> {
                   _buildStep0(colors, isDark),
                   _buildStep1(colors, isDark),
                   _buildStep2(colors, isDark),
-                  _buildStep3(colors, isDark),
-                  _buildStep4(colors, isDark),
                 ],
               ),
             ),
 
             // ── Bottom actions ────────────────────────────────────────────
             Padding(
-              padding: const EdgeInsets.fromLTRB(24, 8, 24, 32),
+              padding: const EdgeInsets.fromLTRB(24, 6, 24, 20),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   if (_error != null)
                     Container(
                       width: double.infinity,
-                      margin: const EdgeInsets.only(bottom: 12),
+                      margin: const EdgeInsets.only(bottom: 10),
                       padding: const EdgeInsets.symmetric(
-                          horizontal: 14, vertical: 10),
+                          horizontal: 12, vertical: 8),
                       decoration: BoxDecoration(
                         color: Colors.redAccent.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(10),
@@ -490,54 +444,51 @@ class _CompleteProfileScreenState extends ConsumerState<CompleteProfileScreen> {
                         textAlign: TextAlign.center,
                         style: const TextStyle(
                           color: Colors.redAccent,
-                          fontSize: 13,
+                          fontSize: 12.5,
                           fontWeight: FontWeight.w500,
                         ),
                       ),
                     ),
-                  SizedBox(
-                    width: double.infinity,
-                    height: 52,
-                    child: _buildGradientButton(
-                      label: _step == _totalSteps - 1 ? 'Finish' : 'Continue',
-                      colors: colors,
-                      loading: _loading,
-                      onTap: _loading ? null : _next,
-                    ),
+                  Row(
+                    children: [
+                      TextButton(
+                        onPressed: _loading
+                            ? null
+                            : (_step == 0
+                                ? () => ref.read(authServiceProvider).signOut()
+                                : _skip),
+                        style: TextButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 14, vertical: 12),
+                        ),
+                        child: Text(
+                          _step == 0
+                              ? 'Sign out'
+                              : _step == _totalSteps - 1
+                                  ? 'Finish later'
+                                  : 'Skip for now',
+                          style: TextStyle(
+                            fontSize: 13.5,
+                            color: Colors.grey.shade500,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                      const Spacer(),
+                      SizedBox(
+                        height: 46,
+                        width: 150,
+                        child: _buildGradientButton(
+                          label: _step == _totalSteps - 1
+                              ? 'Finish'
+                              : 'Continue',
+                          colors: colors,
+                          loading: _loading,
+                          onTap: _loading ? null : _next,
+                        ),
+                      ),
+                    ],
                   ),
-                  if (_step > 0) ...[
-                    const SizedBox(height: 10),
-                    TextButton(
-                      onPressed: _loading ? null : _skip,
-                      child: Text(
-                        _step == _totalSteps - 1
-                            ? 'Finish later'
-                            : 'Skip for now',
-                        style: TextStyle(
-                          fontSize: 14,
-                          color: Colors.grey.shade500,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ),
-                  ],
-                  // Sign out escape hatch on step 0
-                  if (_step == 0) ...[
-                    const SizedBox(height: 10),
-                    TextButton(
-                      onPressed: _loading
-                          ? null
-                          : () => ref.read(authServiceProvider).signOut(),
-                      child: Text(
-                        'Sign out',
-                        style: TextStyle(
-                          color: Colors.grey.shade500,
-                          fontWeight: FontWeight.w500,
-                          fontSize: 14,
-                        ),
-                      ),
-                    ),
-                  ],
                 ],
               ),
             ),
@@ -551,30 +502,156 @@ class _CompleteProfileScreenState extends ConsumerState<CompleteProfileScreen> {
   // Steps
   // ─────────────────────────────────────────────────────────────────────────
 
-  // Step 0 — Basic Info
+  // Step 0 — Identity (avatar + name + username)
   Widget _buildStep0(AppColorScheme colors, bool isDark) {
     return SingleChildScrollView(
       padding: const EdgeInsets.symmetric(horizontal: 24),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _stepTitle("What's your name?", 'This is how others will find you.'),
-          const SizedBox(height: 28),
-          _label('Full Name', isDark),
+          _stepTitle("Tell us about you", 'A photo and a name to get started.'),
+          const SizedBox(height: 16),
+
+          // ── Avatar picker ──────────────────────────────────────────────
+          Center(
+            child: GestureDetector(
+              onTap: _loading ? null : _pickAvatar,
+              child: Stack(
+                children: [
+                  Container(
+                    width: 92,
+                    height: 92,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      gradient: _avatarFile == null
+                          ? LinearGradient(
+                              colors: [
+                                colors.primary.withValues(alpha: 0.15),
+                                colors.accent.withValues(alpha: 0.15),
+                              ],
+                            )
+                          : null,
+                      border: Border.all(
+                        color: colors.primary.withValues(alpha: 0.4),
+                        width: 2.5,
+                      ),
+                    ),
+                    child: _avatarFile != null
+                        ? ClipOval(
+                            child:
+                                Image.file(_avatarFile!, fit: BoxFit.cover),
+                          )
+                        : (_pickedAvatarUrl ?? _existingAvatarUrl) != null
+                            ? ClipOval(
+                                child: AppCachedImage(
+                                  imageUrl:
+                                      _pickedAvatarUrl ?? _existingAvatarUrl,
+                                  width: 92,
+                                  height: 92,
+                                  fit: BoxFit.cover,
+                                ),
+                              )
+                            : Icon(
+                                Icons.person_rounded,
+                                size: 44,
+                                color: colors.primary.withValues(alpha: 0.5),
+                              ),
+                  ),
+                  Positioned(
+                    bottom: 0,
+                    right: 0,
+                    child: Container(
+                      width: 30,
+                      height: 30,
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [colors.primary, colors.accent],
+                        ),
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: isDark
+                              ? AppColors.darkScaffold
+                              : AppColors.lightScaffold,
+                          width: 2.5,
+                        ),
+                      ),
+                      child: const Icon(
+                        Icons.camera_alt_rounded,
+                        size: 16,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
           const SizedBox(height: 8),
+          Center(
+            child: Text(
+              'Tap to choose a photo',
+              style: TextStyle(
+                fontSize: 13,
+                color: Colors.grey.shade500,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ),
+          const SizedBox(height: 6),
+          Center(
+            child: GestureDetector(
+              onTap: _loading
+                  ? null
+                  : () => showCustomAvatarPicker(
+                        context,
+                        onPicked: (url) {
+                          setState(() {
+                            _pickedAvatarUrl = url;
+                            _avatarFile = null;
+                          });
+                        },
+                      ),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 4),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      Icons.face_retouching_natural_rounded,
+                      size: 15,
+                      color: colors.primary,
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      'Or pick a custom avatar',
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: colors.primary,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+
+          const SizedBox(height: 18),
+          _label('Full Name', isDark),
+          const SizedBox(height: 6),
           _textField(
             controller: _nameController,
-            hint: 'e.g. Alex Johnson',
+            hint: 'e.g. John Doe',
             icon: Icons.person_outline_rounded,
             colors: colors,
             isDark: isDark,
           ),
-          const SizedBox(height: 20),
+          const SizedBox(height: 14),
           _label('Username', isDark),
-          const SizedBox(height: 8),
+          const SizedBox(height: 6),
           _textField(
             controller: _usernameController,
-            hint: 'e.g. alexjohnson',
+            hint: 'e.g. johndoe',
             icon: Icons.alternate_email_rounded,
             colors: colors,
             isDark: isDark,
@@ -630,143 +707,28 @@ class _CompleteProfileScreenState extends ConsumerState<CompleteProfileScreen> {
     );
   }
 
-  // Step 1 — Photo & Bio
+  // Step 1 — About you (bio + gender + DOB + location)
   Widget _buildStep1(AppColorScheme colors, bool isDark) {
+    const genders = [
+      'Male',
+      'Female',
+      'Non-binary',
+      'Other',
+      'Prefer not to say',
+    ];
+
     return SingleChildScrollView(
       padding: const EdgeInsets.symmetric(horizontal: 24),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _stepTitle('Add a photo & bio', 'Help others know who you are.'),
-          const SizedBox(height: 28),
+          _stepTitle('A bit more about you',
+              'All optional — skip anything you\'d rather leave out.'),
+          const SizedBox(height: 16),
 
-          // Avatar picker
-          Center(
-            child: GestureDetector(
-              onTap: _loading ? null : _pickAvatar,
-              child: Stack(
-                children: [
-                  Container(
-                    width: 110,
-                    height: 110,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      gradient: _avatarFile == null
-                          ? LinearGradient(
-                              colors: [
-                                colors.primary.withValues(alpha: 0.15),
-                                colors.accent.withValues(alpha: 0.15),
-                              ],
-                            )
-                          : null,
-                      border: Border.all(
-                        color: colors.primary.withValues(alpha: 0.4),
-                        width: 2.5,
-                      ),
-                    ),
-                    child: _avatarFile != null
-                        ? ClipOval(
-                            child:
-                                Image.file(_avatarFile!, fit: BoxFit.cover),
-                          )
-                        : (_pickedAvatarUrl ?? _existingAvatarUrl) != null
-                            ? ClipOval(
-                                child: AppCachedImage(
-                                  imageUrl:
-                                      _pickedAvatarUrl ?? _existingAvatarUrl,
-                                  width: 110,
-                                  height: 110,
-                                  fit: BoxFit.cover,
-                                ),
-                              )
-                            : Icon(
-                                Icons.person_rounded,
-                                size: 52,
-                                color: colors.primary.withValues(alpha: 0.5),
-                              ),
-                  ),
-                  Positioned(
-                    bottom: 0,
-                    right: 0,
-                    child: Container(
-                      width: 34,
-                      height: 34,
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          colors: [colors.primary, colors.accent],
-                        ),
-                        shape: BoxShape.circle,
-                        border: Border.all(
-                          color: isDark
-                              ? AppColors.darkScaffold
-                              : AppColors.lightScaffold,
-                          width: 2.5,
-                        ),
-                      ),
-                      child: const Icon(
-                        Icons.camera_alt_rounded,
-                        size: 16,
-                        color: Colors.white,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-          const SizedBox(height: 8),
-          Center(
-            child: Text(
-              'Tap to choose a photo',
-              style: TextStyle(
-                fontSize: 13,
-                color: Colors.grey.shade500,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-          ),
-          const SizedBox(height: 8),
-          Center(
-            child: GestureDetector(
-              onTap: _loading
-                  ? null
-                  : () => showCustomAvatarPicker(
-                        context,
-                        onPicked: (url) {
-                          setState(() {
-                            _pickedAvatarUrl = url;
-                            _avatarFile = null;
-                          });
-                        },
-                      ),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(vertical: 4),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      Icons.face_retouching_natural_rounded,
-                      size: 15,
-                      color: colors.primary,
-                    ),
-                    const SizedBox(width: 6),
-                    Text(
-                      'Or pick a custom avatar',
-                      style: TextStyle(
-                        fontSize: 13,
-                        color: colors.primary,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-
-          const SizedBox(height: 24),
+          // ── Bio ────────────────────────────────────────────────────────
           _label('Bio', isDark),
-          const SizedBox(height: 8),
+          const SizedBox(height: 6),
           Container(
             decoration: BoxDecoration(
               color: isDark
@@ -781,22 +743,22 @@ class _CompleteProfileScreenState extends ConsumerState<CompleteProfileScreen> {
             ),
             child: TextField(
               controller: _bioController,
-              maxLines: 4,
+              maxLines: 3,
               maxLength: 150,
               style: TextStyle(
                 color: isDark ? Colors.white : Colors.black,
                 fontWeight: FontWeight.w500,
-                fontSize: 15,
+                fontSize: 14,
               ),
               decoration: InputDecoration(
                 hintText: 'Tell people a bit about yourself…',
                 hintStyle: TextStyle(
                   color: Colors.grey.shade400,
                   fontWeight: FontWeight.w400,
-                  fontSize: 15,
+                  fontSize: 14,
                 ),
                 border: InputBorder.none,
-                contentPadding: const EdgeInsets.all(16),
+                contentPadding: const EdgeInsets.all(12),
                 counterStyle: TextStyle(
                   color: Colors.grey.shade500,
                   fontSize: 11,
@@ -804,35 +766,15 @@ class _CompleteProfileScreenState extends ConsumerState<CompleteProfileScreen> {
               ),
             ),
           ),
-        ],
-      ),
-    );
-  }
 
-  // Step 2 — About You
-  Widget _buildStep2(AppColorScheme colors, bool isDark) {
-    const genders = [
-      'Male',
-      'Female',
-      'Non-binary',
-      'Other',
-      'Prefer not to say',
-    ];
+          const SizedBox(height: 14),
 
-    return SingleChildScrollView(
-      padding: const EdgeInsets.symmetric(horizontal: 24),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _stepTitle(
-              'A bit about you', 'Used to personalise your experience.'),
-          const SizedBox(height: 28),
-
+          // ── Gender ─────────────────────────────────────────────────────
           _label('Gender', isDark),
-          const SizedBox(height: 12),
+          const SizedBox(height: 8),
           Wrap(
-            spacing: 10,
-            runSpacing: 10,
+            spacing: 8,
+            runSpacing: 8,
             children: genders.map((g) {
               final selected = _selectedGender == g;
               return GestureDetector(
@@ -841,14 +783,14 @@ class _CompleteProfileScreenState extends ConsumerState<CompleteProfileScreen> {
                 child: AnimatedContainer(
                   duration: const Duration(milliseconds: 180),
                   padding: const EdgeInsets.symmetric(
-                      horizontal: 18, vertical: 10),
+                      horizontal: 14, vertical: 8),
                   decoration: BoxDecoration(
                     color: selected
                         ? colors.primary.withValues(alpha: 0.13)
                         : (isDark
                             ? Colors.white.withValues(alpha: 0.06)
                             : Colors.white.withValues(alpha: 0.9)),
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: BorderRadius.circular(11),
                     border: Border.all(
                       color: selected
                           ? colors.primary
@@ -862,7 +804,7 @@ class _CompleteProfileScreenState extends ConsumerState<CompleteProfileScreen> {
                     g,
                     style: TextStyle(
                       fontWeight: FontWeight.w600,
-                      fontSize: 14,
+                      fontSize: 13,
                       color: selected
                           ? colors.primary
                           : (isDark ? Colors.white70 : Colors.black54),
@@ -873,9 +815,11 @@ class _CompleteProfileScreenState extends ConsumerState<CompleteProfileScreen> {
             }).toList(),
           ),
 
-          const SizedBox(height: 28),
+          const SizedBox(height: 14),
+
+          // ── Date of Birth ──────────────────────────────────────────────
           _label('Date of Birth', isDark),
-          const SizedBox(height: 8),
+          const SizedBox(height: 6),
           GestureDetector(
             onTap: () async {
               final now = DateTime.now();
@@ -938,225 +882,362 @@ class _CompleteProfileScreenState extends ConsumerState<CompleteProfileScreen> {
               ),
             ),
           ),
+
+          const SizedBox(height: 12),
         ],
       ),
     );
   }
 
-  // Step 3 — Location
-  Widget _buildStep3(AppColorScheme colors, bool isDark) {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.symmetric(horizontal: 24),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _stepTitle(
-              'Where are you based?', 'Helps you connect with people nearby.'),
-          const SizedBox(height: 28),
-
-          _label('Location', isDark),
-          const SizedBox(height: 8),
-          _textField(
-            controller: _locationController,
-            hint: 'e.g. London, UK',
-            icon: Icons.location_on_rounded,
-            colors: colors,
-            isDark: isDark,
-          ),
-          const SizedBox(height: 14),
-          SizedBox(
-            width: double.infinity,
-            child: OutlinedButton.icon(
-              onPressed: _detectingLocation ? null : _detectLocation,
-              icon: _detectingLocation
-                  ? SizedBox(
-                      width: 16,
-                      height: 16,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: colors.primary,
-                      ),
-                    )
-                  : Icon(Icons.my_location_rounded,
-                      color: colors.primary, size: 18),
-              label: Text(
-                _detectingLocation
-                    ? 'Detecting…'
-                    : 'Use my current location',
-                style: TextStyle(
-                  color: colors.primary,
-                  fontWeight: FontWeight.w600,
-                  fontSize: 14,
-                ),
-              ),
-              style: OutlinedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(vertical: 13),
-                side: BorderSide(
-                    color: colors.primary.withValues(alpha: 0.4)),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(14),
-                ),
-              ),
-            ),
-          ),
-          if (_latitude != null)
-            Padding(
-              padding: const EdgeInsets.only(top: 10),
-              child: Row(
-                children: [
-                  Icon(Icons.check_circle_rounded,
-                      size: 14, color: Colors.green.shade600),
-                  const SizedBox(width: 6),
-                  Text(
-                    'Location detected',
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w500,
-                      color: Colors.green.shade600,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-        ],
-      ),
-    );
-  }
-
-  // Step 4 — Interests
-  Widget _buildStep4(AppColorScheme colors, bool isDark) {
+  // Step 2 — Interests (hobbies)
+  Widget _buildStep2(AppColorScheme colors, bool isDark) {
     final hobbiesAsync = ref.watch(allHobbiesProvider);
+    final countsAsync = ref.watch(hobbyCountsProvider);
+    final counts = countsAsync.asData?.value ?? const <int, int>{};
 
     return hobbiesAsync.when(
-      loading: () =>
-          const Center(child: CircularProgressIndicator()),
-      error: (_, __) =>
+      loading: () => const Center(child: CircularProgressIndicator()),
+      error: (_, _) =>
           const Center(child: Text('Could not load interests')),
       data: (allHobbies) {
-        final categories = <String, List<Hobby>>{};
-        for (final h in allHobbies) {
-          categories.putIfAbsent(h.category, () => []).add(h);
+        final q = _hobbyQuery.trim().toLowerCase();
+        final filtered = q.isEmpty
+            ? allHobbies
+            : allHobbies
+                .where((h) => h.name.toLowerCase().contains(q))
+                .toList();
+
+        final popular = <Hobby>[];
+        if (q.isEmpty && counts.isNotEmpty) {
+          final ranked = [...allHobbies]
+            ..sort((a, b) =>
+                (counts[b.id] ?? 0).compareTo(counts[a.id] ?? 0));
+          popular.addAll(ranked.where((h) => (counts[h.id] ?? 0) > 0).take(6));
         }
 
-        return SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 24),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _stepTitle('Your interests',
-                  'Tap to select · tap again to mark as primary ⭐'),
-              if (_selectedHobbyIds.isNotEmpty) ...[
-                const SizedBox(height: 6),
-                Text(
-                  '${_selectedHobbyIds.length} selected'
-                  '${_primaryHobbyId != null ? ' · 1 primary' : ''}',
-                  style: TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                    color: colors.primary,
-                  ),
-                ),
-              ],
-              const SizedBox(height: 20),
-              ...categories.entries.map((entry) => Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        entry.key.toUpperCase(),
-                        style: TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w800,
-                          letterSpacing: 1.2,
-                          color: Colors.grey.shade500,
-                        ),
-                      ),
-                      const SizedBox(height: 10),
-                      Wrap(
-                        spacing: 8,
-                        runSpacing: 8,
-                        children: entry.value.map((hobby) {
-                          final selected =
-                              _selectedHobbyIds.contains(hobby.id);
-                          final isPrimary = _primaryHobbyId == hobby.id;
-                          final color = hobby.colorValue;
+        final byCategory = <String, List<Hobby>>{};
+        for (final h in filtered) {
+          byCategory.putIfAbsent(h.category, () => []).add(h);
+        }
 
-                          return GestureDetector(
-                            onTap: () {
-                              setState(() {
-                                if (!selected) {
-                                  _selectedHobbyIds.add(hobby.id);
-                                } else if (!isPrimary) {
-                                  _primaryHobbyId = hobby.id;
-                                } else {
-                                  _selectedHobbyIds.remove(hobby.id);
-                                  _primaryHobbyId = null;
-                                }
-                              });
-                            },
-                            child: AnimatedContainer(
-                              duration: const Duration(milliseconds: 180),
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 12, vertical: 8),
-                              decoration: BoxDecoration(
-                                color: selected
-                                    ? color.withValues(
-                                        alpha: isDark ? 0.2 : 0.1)
-                                    : (isDark
-                                        ? Colors.white
-                                            .withValues(alpha: 0.05)
-                                        : Colors.white
-                                            .withValues(alpha: 0.9)),
-                                borderRadius:
-                                    BorderRadius.circular(12),
-                                border: Border.all(
-                                  color: selected
-                                      ? color.withValues(alpha: 0.7)
-                                      : (isDark
-                                          ? Colors.white
-                                              .withValues(alpha: 0.1)
-                                          : Colors.black
-                                              .withValues(alpha: 0.08)),
-                                  width: isPrimary ? 2 : 1.5,
+        final primary = _primaryHobbyId == null
+            ? null
+            : allHobbies.firstWhere(
+                (h) => h.id == _primaryHobbyId,
+                orElse: () => allHobbies.first,
+              );
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 24),
+              child: _stepTitle(
+                'Pick your main talent',
+                'The first one you pick is your main. Select any you\'re good at.',
+              ),
+            ),
+            const SizedBox(height: 14),
+
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 24),
+              child: _hobbySearchField(isDark),
+            ),
+
+            // ── Status strip ─────────────────────────────────────────────
+            AnimatedSize(
+              duration: const Duration(milliseconds: 180),
+              curve: Curves.easeOut,
+              child: _selectedHobbyIds.isEmpty
+                  ? const SizedBox.shrink()
+                  : Padding(
+                      padding: const EdgeInsets.fromLTRB(24, 10, 24, 0),
+                      child: Row(
+                        children: [
+                          Icon(Icons.star_rounded,
+                              size: 15, color: Colors.amber.shade600),
+                          const SizedBox(width: 6),
+                          Flexible(
+                            child: Text.rich(
+                              TextSpan(
+                                style: TextStyle(
+                                  fontSize: 12.5,
+                                  fontWeight: FontWeight.w600,
+                                  color: isDark
+                                      ? Colors.white70
+                                      : Colors.black54,
                                 ),
-                              ),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
                                 children: [
-                                  Text(hobby.icon,
-                                      style: const TextStyle(
-                                          fontSize: 14)),
-                                  const SizedBox(width: 6),
-                                  Text(
-                                    hobby.name,
-                                    style: TextStyle(
-                                      fontWeight: FontWeight.w600,
-                                      fontSize: 13,
-                                      color: selected
-                                          ? color
-                                          : (isDark
-                                              ? Colors.white60
-                                              : Colors.black54),
+                                  const TextSpan(text: 'Main: '),
+                                  if (primary != null) ...[
+                                    TextSpan(
+                                      text: '${primary.icon} ${primary.name}',
+                                      style: TextStyle(
+                                        color: primary.colorValue,
+                                        fontWeight: FontWeight.w800,
+                                      ),
                                     ),
-                                  ),
-                                  if (isPrimary) ...[
-                                    const SizedBox(width: 4),
-                                    const Text('⭐',
-                                        style: TextStyle(
-                                            fontSize: 10)),
                                   ],
+                                  TextSpan(
+                                    text:
+                                        '  ·  ${_selectedHobbyIds.length} selected',
+                                  ),
                                 ],
                               ),
+                              overflow: TextOverflow.ellipsis,
                             ),
-                          );
-                        }).toList(),
+                          ),
+                          const SizedBox(width: 8),
+                          GestureDetector(
+                            onTap: () => setState(_selectedHobbyIds.clear),
+                            child: Text(
+                              'Clear',
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w700,
+                                color: Colors.grey.shade600,
+                                decoration: TextDecoration.underline,
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
-                      const SizedBox(height: 20),
-                    ],
-                  )),
-            ],
-          ),
+                    ),
+            ),
+
+            const SizedBox(height: 10),
+
+            // ── Chip sections ────────────────────────────────────────────
+            Expanded(
+              child: filtered.isEmpty
+                  ? _hobbyEmptyState()
+                  : SingleChildScrollView(
+                      padding: const EdgeInsets.fromLTRB(24, 4, 24, 12),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          if (popular.isNotEmpty) ...[
+                            _sectionLabel('POPULAR'),
+                            const SizedBox(height: 8),
+                            _chipWrap(popular, counts, isDark),
+                            const SizedBox(height: 18),
+                          ],
+                          ...byCategory.entries.expand((entry) => [
+                                _sectionLabel(entry.key.toUpperCase()),
+                                const SizedBox(height: 8),
+                                _chipWrap(entry.value, counts, isDark),
+                                const SizedBox(height: 18),
+                              ]),
+                        ],
+                      ),
+                    ),
+            ),
+          ],
         );
       },
+    );
+  }
+
+  String? _formatCount(int n) {
+    if (n <= 0) return null;
+    if (n < 1000) return n.toString();
+    final k = n / 1000;
+    return k < 10
+        ? '${k.toStringAsFixed(1)}k'
+        : '${k.toStringAsFixed(0)}k';
+  }
+
+  Widget _sectionLabel(String text) => Text(
+        text,
+        style: TextStyle(
+          fontSize: 11,
+          fontWeight: FontWeight.w800,
+          letterSpacing: 1.2,
+          color: Colors.grey.shade500,
+        ),
+      );
+
+  Widget _hobbySearchField(bool isDark) {
+    return Container(
+      decoration: BoxDecoration(
+        color: isDark
+            ? Colors.white.withValues(alpha: 0.06)
+            : Colors.white.withValues(alpha: 0.9),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: isDark
+              ? Colors.white.withValues(alpha: 0.08)
+              : Colors.black.withValues(alpha: 0.07),
+        ),
+      ),
+      child: Row(
+        children: [
+          Padding(
+            padding: const EdgeInsets.only(left: 14),
+            child: Icon(Icons.search_rounded,
+                size: 20, color: Colors.grey.shade500),
+          ),
+          Expanded(
+            child: TextField(
+              controller: _hobbySearchController,
+              onChanged: (v) => setState(() => _hobbyQuery = v),
+              style: TextStyle(
+                color: isDark ? Colors.white : Colors.black,
+                fontWeight: FontWeight.w500,
+                fontSize: 15,
+              ),
+              decoration: InputDecoration(
+                hintText: 'Search interests…',
+                hintStyle: TextStyle(
+                  color: Colors.grey.shade400,
+                  fontWeight: FontWeight.w400,
+                  fontSize: 15,
+                ),
+                border: InputBorder.none,
+                contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 12, vertical: 12),
+              ),
+            ),
+          ),
+          if (_hobbyQuery.isNotEmpty)
+            GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: () {
+                _hobbySearchController.clear();
+                setState(() => _hobbyQuery = '');
+              },
+              child: Padding(
+                padding: const EdgeInsets.all(12),
+                child: Icon(Icons.close_rounded,
+                    size: 18, color: Colors.grey.shade500),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _chipWrap(
+      List<Hobby> hobbies, Map<int, int> counts, bool isDark) {
+    return Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      children: hobbies.map((h) => _hobbyChip(h, counts, isDark)).toList(),
+    );
+  }
+
+  Widget _hobbyChip(Hobby hobby, Map<int, int> counts, bool isDark) {
+    final selected = _selectedHobbyIds.contains(hobby.id);
+    final isPrimary = _primaryHobbyId == hobby.id;
+    final color = hobby.colorValue;
+    final countLabel = _formatCount(counts[hobby.id] ?? 0);
+
+    final bg = isPrimary
+        ? color.withValues(alpha: isDark ? 0.25 : 0.14)
+        : selected
+            ? color.withValues(alpha: isDark ? 0.15 : 0.08)
+            : (isDark
+                ? Colors.white.withValues(alpha: 0.05)
+                : Colors.white.withValues(alpha: 0.9));
+
+    final borderColor = isPrimary
+        ? color
+        : selected
+            ? color.withValues(alpha: 0.55)
+            : (isDark
+                ? Colors.white.withValues(alpha: 0.1)
+                : Colors.black.withValues(alpha: 0.07));
+
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: () => setState(() {
+        if (selected) {
+          _selectedHobbyIds.remove(hobby.id);
+        } else {
+          _selectedHobbyIds.add(hobby.id);
+        }
+      }),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 160),
+        padding:
+            const EdgeInsets.symmetric(horizontal: 11, vertical: 7),
+        decoration: BoxDecoration(
+          color: bg,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: borderColor,
+            width: isPrimary ? 1.8 : 1,
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (isPrimary) ...[
+              Icon(Icons.star_rounded,
+                  size: 14, color: Colors.amber.shade600),
+              const SizedBox(width: 4),
+            ],
+            Text(hobby.icon, style: const TextStyle(fontSize: 14)),
+            const SizedBox(width: 6),
+            Text(
+              hobby.name,
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w700,
+                color: selected
+                    ? color
+                    : (isDark ? Colors.white70 : Colors.black54),
+              ),
+            ),
+            if (countLabel != null) ...[
+              const SizedBox(width: 8),
+              Icon(
+                Icons.people_alt_rounded,
+                size: 12,
+                color: selected
+                    ? color.withValues(alpha: 0.75)
+                    : Colors.grey.shade500,
+              ),
+              const SizedBox(width: 3),
+              Text(
+                countLabel,
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                  color: selected
+                      ? color.withValues(alpha: 0.85)
+                      : Colors.grey.shade500,
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _hobbyEmptyState() {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.search_off_rounded,
+                size: 40, color: Colors.grey.shade400),
+            const SizedBox(height: 10),
+            Text(
+              'No interests match "$_hobbyQuery"',
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+                color: Colors.grey.shade500,
+              ),
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -1172,19 +1253,20 @@ class _CompleteProfileScreenState extends ConsumerState<CompleteProfileScreen> {
         Text(
           title,
           style: TextStyle(
-            fontSize: 22,
-            fontWeight: FontWeight.w900,
-            letterSpacing: -0.4,
+            fontSize: 19,
+            fontWeight: FontWeight.w800,
+            letterSpacing: -0.3,
             color: isDark ? Colors.white : Colors.black,
           ),
         ),
-        const SizedBox(height: 5),
+        const SizedBox(height: 3),
         Text(
           subtitle,
           style: TextStyle(
-            fontSize: 14,
+            fontSize: 12.5,
             color: Colors.grey.shade500,
             fontWeight: FontWeight.w500,
+            height: 1.35,
           ),
         ),
       ],
@@ -1195,7 +1277,7 @@ class _CompleteProfileScreenState extends ConsumerState<CompleteProfileScreen> {
     return Text(
       text,
       style: TextStyle(
-        fontSize: 13,
+        fontSize: 12,
         fontWeight: FontWeight.w700,
         letterSpacing: 0.2,
         color: isDark ? Colors.white70 : Colors.black54,
@@ -1246,18 +1328,18 @@ class _CompleteProfileScreenState extends ConsumerState<CompleteProfileScreen> {
               style: TextStyle(
                 color: isDark ? Colors.white : Colors.black,
                 fontWeight: FontWeight.w500,
-                fontSize: 15,
+                fontSize: 14,
               ),
               decoration: InputDecoration(
                 hintText: hint,
                 hintStyle: TextStyle(
                   color: Colors.grey.shade400,
                   fontWeight: FontWeight.w400,
-                  fontSize: 15,
+                  fontSize: 14,
                 ),
                 border: InputBorder.none,
                 contentPadding: const EdgeInsets.symmetric(
-                    horizontal: 12, vertical: 15),
+                    horizontal: 12, vertical: 12),
               ),
             ),
           ),

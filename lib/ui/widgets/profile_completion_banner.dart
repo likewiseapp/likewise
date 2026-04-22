@@ -10,26 +10,21 @@ import '../../core/providers/profile_providers.dart';
 import '../../core/theme_provider.dart';
 
 /// Calculates how complete a profile is (0.0 – 1.0).
-/// Fields checked: bio, gender, date_of_birth, location, hobbies.
+/// Fields checked: gender, date_of_birth, hobbies. Bio and location are
+/// excluded (bio is optional flavor, location is auto-detected on home).
 double profileCompletion(Profile profile, List<UserHobby> hobbies) {
   int filled = 0;
-  if (profile.bio != null && profile.bio!.isNotEmpty) filled++;
   if (profile.gender != null && profile.gender!.isNotEmpty) filled++;
   if (profile.dateOfBirth != null) filled++;
-  if (profile.location != null && profile.location!.isNotEmpty) filled++;
   if (hobbies.isNotEmpty) filled++;
-  return filled / 5;
+  return filled / 3;
 }
 
 /// List of human-readable labels for the fields that are still empty.
 List<String> missingFields(Profile profile, List<UserHobby> hobbies) {
   final missing = <String>[];
-  if (profile.bio == null || profile.bio!.isEmpty) missing.add('Bio');
   if (profile.gender == null || profile.gender!.isEmpty) missing.add('Gender');
   if (profile.dateOfBirth == null) missing.add('Date of birth');
-  if (profile.location == null || profile.location!.isEmpty) {
-    missing.add('Location');
-  }
   if (hobbies.isEmpty) missing.add('Interests');
   return missing;
 }

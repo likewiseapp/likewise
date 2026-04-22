@@ -5,11 +5,11 @@ import '../services/notification_service.dart';
 import 'auth_providers.dart';
 
 final notificationsProvider =
-    FutureProvider<List<AppNotification>>((ref) async {
+    StreamProvider<List<AppNotification>>((ref) {
   final userId = ref.watch(currentUserIdProvider);
-  if (userId == null) return [];
+  if (userId == null) return Stream.value(<AppNotification>[]);
   final client = ref.watch(supabaseProvider);
-  return NotificationService(client).fetchNotifications(userId);
+  return NotificationService(client).streamNotifications(userId);
 });
 
 final notificationServiceProvider = Provider<NotificationService>((ref) {

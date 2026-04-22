@@ -35,14 +35,23 @@ class SettingsScreen extends ConsumerWidget {
 
     return Scaffold(
       backgroundColor: bg,
-      body: CustomScrollView(
-        slivers: [
-          // ── Header ─────────────────────────────────────────────────
-          SliverToBoxAdapter(
-            child: SafeArea(
-              bottom: false,
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(8, 8, 20, 0),
+      body: SafeArea(
+        bottom: false,
+        child: CustomScrollView(
+          slivers: [
+            // ── Sticky header ────────────────────────────────────────
+            SliverAppBar(
+              pinned: true,
+              primary: false,
+              automaticallyImplyLeading: false,
+              backgroundColor: bg,
+              surfaceTintColor: Colors.transparent,
+              elevation: 0,
+              scrolledUnderElevation: 0,
+              toolbarHeight: 56,
+              titleSpacing: 0,
+              title: Padding(
+                padding: const EdgeInsets.fromLTRB(8, 0, 20, 0),
                 child: Row(
                   children: [
                     IconButton(
@@ -59,7 +68,10 @@ class SettingsScreen extends ConsumerWidget {
                     const SizedBox(width: 4),
                     Text(
                       'Settings',
-                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                      style: Theme.of(context)
+                          .textTheme
+                          .titleLarge
+                          ?.copyWith(
                             fontWeight: FontWeight.w800,
                             letterSpacing: -0.3,
                           ),
@@ -68,9 +80,8 @@ class SettingsScreen extends ConsumerWidget {
                 ),
               ),
             ),
-          ),
 
-          const SliverToBoxAdapter(child: SizedBox(height: 14)),
+            const SliverToBoxAdapter(child: SizedBox(height: 14)),
 
           // ── Account ────────────────────────────────────────────────
           _SectionLabel(text: 'Account', color: subtleText),
@@ -234,12 +245,13 @@ class SettingsScreen extends ConsumerWidget {
             ],
           ),
 
-          SliverToBoxAdapter(
-            child: SizedBox(
-              height: MediaQuery.of(context).padding.bottom + 24,
+            SliverToBoxAdapter(
+              child: SizedBox(
+                height: MediaQuery.of(context).padding.bottom + 24,
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'core/app_theme.dart';
@@ -275,10 +276,8 @@ class _SplashScreen extends ConsumerWidget {
             const SizedBox(height: 20),
             Text(
               'likewise',
-              style: TextStyle(
-                fontSize: 28,
-                fontWeight: FontWeight.w900,
-                letterSpacing: -0.5,
+              style: GoogleFonts.greatVibes(
+                fontSize: 40,
                 color: isDark ? Colors.white : Colors.black,
               ),
             ),

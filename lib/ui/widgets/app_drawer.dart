@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 import '../../core/providers/auth_providers.dart';
 import '../../core/providers/navigation_providers.dart';
@@ -113,17 +114,32 @@ class AppDrawer extends ConsumerWidget {
                 ),
                 child: Row(
                   children: [
+                    Container(
+                      padding: const EdgeInsets.all(3),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(6),
+                        child: Image.asset(
+                          'assets/icon.png',
+                          width: 32,
+                          height: 32,
+                          fit: BoxFit.cover,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
                     ShaderMask(
                       shaderCallback: (bounds) => LinearGradient(
                         colors: [colors.primary, colors.accent],
                       ).createShader(bounds),
                       blendMode: BlendMode.srcIn,
-                      child: const Text(
+                      child: Text(
                         'likewise',
-                        style: TextStyle(
-                          fontSize: 20,
-                          fontWeight: FontWeight.w900,
-                          letterSpacing: -0.8,
+                        style: GoogleFonts.greatVibes(
+                          fontSize: 38,
                           color: Colors.white,
                         ),
                       ),

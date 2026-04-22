@@ -6,7 +6,9 @@ import 'package:go_router/go_router.dart';
 
 import '../../core/app_theme.dart';
 import '../../core/providers/navigation_providers.dart';
+import '../../core/providers/profile_providers.dart';
 import '../../core/providers/wave_providers.dart';
+import '../../core/services/location_service.dart';
 import '../../core/theme_provider.dart';
 import '../widgets/app_drawer.dart';
 import '../widgets/profile_completion_banner.dart';
@@ -33,9 +35,24 @@ class _MainScreenState extends ConsumerState<MainScreen> {
   bool _showSuccessBanner = false;
   String? _uploadError;
   bool _profileBannerDismissed = false;
+  bool _locationAutoDetectTried = false;
 
   @override
   Widget build(BuildContext context) {
+    // Auto-detect location once per mount as soon as the profile resolves
+    // and we can confirm it has no saved coordinates.
+    ref.listen(fullProfileProvider, (_, next) {
+      if (_locationAutoDetectTried) return;
+      final profile = next.asData?.value;
+      if (profile == null) return;
+      if (profile.latitude != null && profile.longitude != null) {
+        _locationAutoDetectTried = true;
+        return;
+      }
+      _locationAutoDetectTried = true;
+      LocationService.detectAndSaveForCurrentUser(ref);
+    });
+
     final colors = ref.watch(appColorSchemeProvider);
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final bottomPadding = MediaQuery.of(context).padding.bottom;

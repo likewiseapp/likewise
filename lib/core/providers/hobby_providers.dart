@@ -9,6 +9,13 @@ final allHobbiesProvider = FutureProvider<List<Hobby>>((ref) async {
   return HobbyService(client).fetchAll();
 });
 
+/// Map of `hobbyId → total user count`, computed from `user_hobbies`.
+/// Hobbies with zero users are omitted.
+final hobbyCountsProvider = FutureProvider<Map<int, int>>((ref) async {
+  final client = ref.watch(supabaseProvider);
+  return HobbyService(client).fetchHobbyCounts();
+});
+
 /// Batch-fetch a display hobby (primary or fallback) for each user.
 /// Family key is a comma-joined, sorted string of user IDs so Riverpod
 /// equality works correctly (List creates a new reference every build).

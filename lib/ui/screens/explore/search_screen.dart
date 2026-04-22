@@ -277,10 +277,11 @@ class _SearchScreenState extends ConsumerState<SearchScreen>
                   ),
                 ),
 
-                // Space above bottom nav bar (64px bar + system bottom inset)
+                // Clearance for the floating nav bar (64pt height + 24pt
+                // gap-from-screen-bottom + device safe-area inset).
                 SliverToBoxAdapter(
                   child: SizedBox(
-                    height: 64 + MediaQuery.of(context).padding.bottom + 16,
+                    height: 100 + MediaQuery.of(context).padding.bottom,
                   ),
                 ),
               ],

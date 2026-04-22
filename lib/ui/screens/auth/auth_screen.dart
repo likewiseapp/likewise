@@ -2,6 +2,8 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:flutter_svg/flutter_svg.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 import '../../../core/app_theme.dart';
 import '../../../core/providers/auth_providers.dart';
@@ -24,6 +26,8 @@ class _AuthScreenState extends ConsumerState<AuthScreen>
   String? _error;
   bool _obscurePassword = true;
   bool _agreedToTerms = false;
+
+  static const bool _showAppleSignIn = false;
 
   @override
   void initState() {
@@ -79,6 +83,10 @@ class _AuthScreenState extends ConsumerState<AuthScreen>
     } finally {
       if (mounted) setState(() => _loading = false);
     }
+  }
+
+  Future<void> _signInWithApple() async {
+    setState(() => _error = 'Apple Sign-In is coming soon.');
   }
 
   Future<void> _signUp() async {
@@ -160,6 +168,65 @@ class _AuthScreenState extends ConsumerState<AuthScreen>
     );
   }
 
+  void _showPrivacy() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: isDark ? AppColors.darkSurface : Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (_) => Padding(
+        padding: const EdgeInsets.fromLTRB(24, 16, 24, 40),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Center(
+              child: Container(
+                width: 36,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade400,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ),
+            const SizedBox(height: 20),
+            Text(
+              'Privacy Policy',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w800,
+                color: isDark ? Colors.white : Colors.black,
+              ),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              'Likewise collects and processes only the data required to run the '
+              'service — your profile, hobbies, location and the content you share. '
+              'We never sell your personal data. You can request deletion of your '
+              'account and associated data at any time from Settings.',
+              style: TextStyle(
+                fontSize: 14,
+                height: 1.6,
+                color: Colors.grey.shade500,
+              ),
+            ),
+            const SizedBox(height: 24),
+            SizedBox(
+              width: double.infinity,
+              child: TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Close'),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final colors = ref.watch(appColorSchemeProvider);
@@ -176,53 +243,50 @@ class _AuthScreenState extends ConsumerState<AuthScreen>
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                const SizedBox(height: 12),
+                const SizedBox(height: 4),
 
                 // ── Logo ────────────────────────────────────────────────────
                 Container(
-                  width: 80,
-                  height: 80,
+                  width: 68,
+                  height: 68,
+                  padding: const EdgeInsets.all(6),
                   decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: [colors.primary, colors.accent],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
-                    borderRadius: BorderRadius.circular(24),
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(20),
                     boxShadow: [
                       BoxShadow(
                         color: colors.primary.withValues(alpha: 0.35),
-                        blurRadius: 24,
-                        offset: const Offset(0, 10),
+                        blurRadius: 20,
+                        offset: const Offset(0, 8),
                       ),
                     ],
                   ),
-                  child: const Icon(
-                    Icons.people_alt_rounded,
-                    color: Colors.white,
-                    size: 38,
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(14),
+                    child: Image.asset(
+                      'assets/icon.png',
+                      fit: BoxFit.cover,
+                    ),
                   ),
                 ),
-                const SizedBox(height: 18),
+                const SizedBox(height: 10),
                 Text(
                   'likewise',
-                  style: TextStyle(
-                    fontSize: 30,
-                    fontWeight: FontWeight.w900,
-                    letterSpacing: -0.5,
+                  style: GoogleFonts.greatVibes(
+                    fontSize: 36,
                     color: isDark ? Colors.white : Colors.black,
                   ),
                 ),
-                const SizedBox(height: 4),
+                const SizedBox(height: 2),
                 Text(
                   'Find your people',
                   style: TextStyle(
-                    fontSize: 14,
+                    fontSize: 13,
                     color: Colors.grey.shade500,
                     fontWeight: FontWeight.w500,
                   ),
                 ),
-                const SizedBox(height: 32),
+                const SizedBox(height: 20),
 
                 // ── Tab bar ──────────────────────────────────────────────────
                 Container(
@@ -263,7 +327,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen>
                     ],
                   ),
                 ),
-                const SizedBox(height: 28),
+                const SizedBox(height: 18),
 
                 // ── Form fields ──────────────────────────────────────────────
                 AnimatedBuilder(
@@ -330,11 +394,11 @@ class _AuthScreenState extends ConsumerState<AuthScreen>
 
                         // ── Sign Up extras ───────────────────────────────────
                         if (isSignUp) ...[
-                          const SizedBox(height: 16),
+                          const SizedBox(height: 12),
                           _buildTermsRow(isDark, colors),
                         ],
 
-                        const SizedBox(height: 20),
+                        const SizedBox(height: 14),
 
                         // ── Error ────────────────────────────────────────────
                         if (_error != null)
@@ -367,7 +431,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen>
                         // ── Submit button ─────────────────────────────────────
                         SizedBox(
                           width: double.infinity,
-                          height: 52,
+                          height: 48,
                           child: MaterialButton(
                             onPressed: _loading
                                 ? null
@@ -418,7 +482,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen>
                           ),
                         ),
 
-                        const SizedBox(height: 20),
+                        const SizedBox(height: 14),
 
                         // ── Divider ─────────────────────────────────────────
                         Row(
@@ -451,17 +515,18 @@ class _AuthScreenState extends ConsumerState<AuthScreen>
                             ),
                           ],
                         ),
-                        const SizedBox(height: 16),
+                        const SizedBox(height: 12),
 
                         // ── Google Sign-In ──────────────────────────────────
                         SizedBox(
                           width: double.infinity,
-                          height: 52,
+                          height: 48,
                           child: OutlinedButton.icon(
                             onPressed: _loading ? null : _signInWithGoogle,
-                            icon: const Icon(
-                              Icons.g_mobiledata_rounded,
-                              size: 28,
+                            icon: SvgPicture.asset(
+                              'assets/google_logo.svg',
+                              width: 20,
+                              height: 20,
                             ),
                             label: const Text(
                               'Continue with Google',
@@ -484,12 +549,88 @@ class _AuthScreenState extends ConsumerState<AuthScreen>
                             ),
                           ),
                         ),
+                        const SizedBox(height: 10),
+
+                        // ── Apple Sign-In ───────────────────────────────────
+                        if (_showAppleSignIn) ...[
+                          SizedBox(
+                            width: double.infinity,
+                            height: 48,
+                            child: OutlinedButton.icon(
+                              onPressed: _loading ? null : _signInWithApple,
+                              icon: Icon(
+                                Icons.apple,
+                                size: 22,
+                                color: isDark ? Colors.black : Colors.white,
+                              ),
+                              label: Text(
+                                'Continue with Apple',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: 15,
+                                  color: isDark ? Colors.black : Colors.white,
+                                ),
+                              ),
+                              style: OutlinedButton.styleFrom(
+                                backgroundColor:
+                                    isDark ? Colors.white : Colors.black,
+                                side: BorderSide.none,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(14),
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 10),
+                        ],
+                        RichText(
+                          textAlign: TextAlign.center,
+                          text: TextSpan(
+                            style: TextStyle(
+                              fontSize: 11.5,
+                              height: 1.45,
+                              color: Colors.grey.shade500,
+                              fontWeight: FontWeight.w500,
+                            ),
+                            children: [
+                              TextSpan(
+                                text: _showAppleSignIn
+                                    ? 'By continuing with Google or Apple, you agree to our '
+                                    : 'By continuing with Google, you agree to our ',
+                              ),
+                              TextSpan(
+                                text: 'Terms',
+                                style: TextStyle(
+                                  color: colors.primary,
+                                  fontWeight: FontWeight.w700,
+                                  decoration: TextDecoration.underline,
+                                  decorationColor: colors.primary,
+                                ),
+                                recognizer: TapGestureRecognizer()
+                                  ..onTap = _showTerms,
+                              ),
+                              const TextSpan(text: ' and '),
+                              TextSpan(
+                                text: 'Privacy Policy',
+                                style: TextStyle(
+                                  color: colors.primary,
+                                  fontWeight: FontWeight.w700,
+                                  decoration: TextDecoration.underline,
+                                  decorationColor: colors.primary,
+                                ),
+                                recognizer: TapGestureRecognizer()
+                                  ..onTap = _showPrivacy,
+                              ),
+                              const TextSpan(text: '.'),
+                            ],
+                          ),
+                        ),
                       ],
                     );
                   },
                 ),
 
-                const SizedBox(height: 24),
+                const SizedBox(height: 14),
               ],
             ),
           ),
@@ -542,6 +683,17 @@ class _AuthScreenState extends ConsumerState<AuthScreen>
                     decorationColor: colors.primary,
                   ),
                   recognizer: TapGestureRecognizer()..onTap = _showTerms,
+                ),
+                const TextSpan(text: ' and '),
+                TextSpan(
+                  text: 'Privacy Policy',
+                  style: TextStyle(
+                    color: colors.primary,
+                    fontWeight: FontWeight.w700,
+                    decoration: TextDecoration.underline,
+                    decorationColor: colors.primary,
+                  ),
+                  recognizer: TapGestureRecognizer()..onTap = _showPrivacy,
                 ),
               ],
             ),
