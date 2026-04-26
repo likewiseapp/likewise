@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:http/http.dart' as http;
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:video_player/video_player.dart';
 
 import '../../../core/models/wave.dart';
@@ -23,46 +21,14 @@ class WavesScreen extends ConsumerStatefulWidget {
 class _WavesScreenState extends ConsumerState<WavesScreen> {
   final PageController _pageController = PageController();
   late final WavePlayerManager _player;
-  String _savedQualityLabel = 'Auto';
-  final _manifestCache = <String, List<_HlsQuality>>{};
-
   @override
   void initState() {
     super.initState();
     _player = WavePlayerManager(
       isMounted: () => mounted,
       setState: setState,
-      qualityUrlResolver: _resolveQualityUrl,
+      qualityUrlResolver: (_) async => null,
     );
-    _loadSavedQuality();
-  }
-
-  Future<void> _loadSavedQuality() async {
-    final label = await _QualityPrefs.load();
-    if (mounted) setState(() => _savedQualityLabel = label);
-  }
-
-  Future<String?> _resolveQualityUrl(String masterUrl) async {
-    if (_savedQualityLabel == 'Auto') return null;
-    try {
-      final qualities = _manifestCache[masterUrl]
-          ?? await _parseQualities(masterUrl);
-      _manifestCache[masterUrl] = qualities;
-      return qualities
-          .where((q) => q.label == _savedQualityLabel)
-          .firstOrNull
-          ?.url;
-    } catch (_) {
-      return null;
-    }
-  }
-
-  Future<void> _onQualityChange(int index, String label, String url) async {
-    await _QualityPrefs.save(label);
-    if (!mounted) return;
-    setState(() => _savedQualityLabel = label);
-    _manifestCache.clear();
-    _player.changeQuality(index, url);
   }
 
   @override
@@ -133,99 +99,32 @@ class _WavesScreenState extends ConsumerState<WavesScreen> {
           }
 
           return PageView.builder(
-            controller: _pageController,
-            scrollDirection: Axis.vertical,
-            itemCount: waves.length,
-            onPageChanged: _player.onPageChanged,
-            itemBuilder: (context, index) => _WaveItem(
-              wave: waves[index],
-              controller: _player.controllers[index],
-              error: _player.errors[index],
-              isActive: index == _player.currentIndex && isTabActive,
-              onTogglePlayPause: () {
-                final ctrl = _player.controllers[index];
-                if (ctrl == null || !ctrl.value.isInitialized) return;
-                setState(() {
-                  ctrl.value.isPlaying ? ctrl.pause() : ctrl.play();
-                });
-              },
-              onQualityChange: (label, url) =>
-                  _onQualityChange(index, label, url),
-              onRetry: () {
-                _player.errors.remove(index);
-                _player.loadAndPlay(index);
-              },
-            ),
+                controller: _pageController,
+                scrollDirection: Axis.vertical,
+                itemCount: waves.length,
+                onPageChanged: _player.onPageChanged,
+                itemBuilder: (context, index) => _WaveItem(
+                  wave: waves[index],
+                  controller: _player.controllers[index],
+                  error: _player.errors[index],
+                  isActive: index == _player.currentIndex && isTabActive,
+                  onTogglePlayPause: () {
+                    final ctrl = _player.controllers[index];
+                    if (ctrl == null || !ctrl.value.isInitialized) return;
+                    setState(() {
+                      ctrl.value.isPlaying ? ctrl.pause() : ctrl.play();
+                    });
+                  },
+                  onRetry: () {
+                    _player.errors.remove(index);
+                    _player.loadAndPlay(index);
+                  },
+                ),
           );
         },
       ),
     );
   }
-}
-
-// ── Quality preference (shared_preferences) ───────────────────────────────────
-
-class _QualityPrefs {
-  static const _key = 'wave_quality_label';
-
-  static Future<String> load() async {
-    final prefs = await SharedPreferences.getInstance();
-    return prefs.getString(_key) ?? 'Auto';
-  }
-
-  static Future<void> save(String label) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_key, label);
-  }
-}
-
-// ── HLS quality model + parser ────────────────────────────────────────────────
-
-class _HlsQuality {
-  final String label;
-  final String url;
-  final int bandwidth;
-
-  const _HlsQuality({
-    required this.label,
-    required this.url,
-    required this.bandwidth,
-  });
-}
-
-Future<List<_HlsQuality>> _parseQualities(String masterUrl) async {
-  final res = await http.get(Uri.parse(masterUrl));
-  final lines = res.body.split('\n');
-  final qualities = <_HlsQuality>[];
-
-  for (int i = 0; i < lines.length - 1; i++) {
-    final line = lines[i].trim();
-    if (!line.startsWith('#EXT-X-STREAM-INF')) continue;
-
-    final nextLine = lines[i + 1].trim();
-    if (nextLine.isEmpty || nextLine.startsWith('#')) continue;
-
-    final resMatch = RegExp(r'RESOLUTION=\d+x(\d+)').firstMatch(line);
-    final bwMatch = RegExp(r'BANDWIDTH=(\d+)').firstMatch(line);
-    final height = resMatch?.group(1);
-    final bandwidth = int.tryParse(bwMatch?.group(1) ?? '') ?? 0;
-
-    final label = height != null ? '${height}p' : 'Unknown';
-    final url = nextLine.startsWith('http')
-        ? nextLine
-        : Uri.parse(masterUrl).resolve(nextLine).toString();
-
-    qualities.add(_HlsQuality(label: label, url: url, bandwidth: bandwidth));
-  }
-
-  // Highest quality first
-  qualities.sort((a, b) => b.bandwidth.compareTo(a.bandwidth));
-
-  // Always prepend Auto (master playlist — lets the player do ABR)
-  return [
-    _HlsQuality(label: 'Auto', url: masterUrl, bandwidth: 0),
-    ...qualities,
-  ];
 }
 
 // ── Waves loading screen ──────────────────────────────────────────────────────
@@ -322,7 +221,6 @@ class _WaveItem extends ConsumerStatefulWidget {
   final String? error;
   final bool isActive;
   final VoidCallback onTogglePlayPause;
-  final void Function(String label, String url) onQualityChange;
   final VoidCallback onRetry;
 
   const _WaveItem({
@@ -331,7 +229,6 @@ class _WaveItem extends ConsumerStatefulWidget {
     required this.error,
     required this.isActive,
     required this.onTogglePlayPause,
-    required this.onQualityChange,
     required this.onRetry,
   });
 
@@ -346,14 +243,10 @@ final _bumpedWaveIds = <String>{};
 class _WaveItemState extends ConsumerState<_WaveItem> {
   bool _showControls = false;
   bool _captionExpanded = false;
-  String _selectedQualityLabel = 'Auto';
 
   @override
   void initState() {
     super.initState();
-    _loadSavedQuality();
-    // Seed the per-wave like state so the heart + count show correctly on
-    // first frame. Post-frame because providers can't be written during init.
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       ref.read(waveLikesProvider.notifier).seedFrom(widget.wave);
@@ -379,11 +272,6 @@ class _WaveItemState extends ConsumerState<_WaveItem> {
     showWaveCommentsSheet(context, waveId: widget.wave.id);
   }
 
-  Future<void> _loadSavedQuality() async {
-    final label = await _QualityPrefs.load();
-    if (mounted) setState(() => _selectedQualityLabel = label);
-  }
-
   void _toggleControls() {
     setState(() => _showControls = !_showControls);
     if (_showControls) {
@@ -391,27 +279,6 @@ class _WaveItemState extends ConsumerState<_WaveItem> {
         if (mounted) setState(() => _showControls = false);
       });
     }
-  }
-
-  void _showQualitySheet() {
-    final colors = ref.read(appColorSchemeProvider);
-    showModalBottomSheet<void>(
-      context: context,
-      backgroundColor: const Color(0xFF1C1C1E),
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (_) => _QualitySheet(
-        masterUrl: widget.wave.videoUrl ?? '',
-        selectedLabel: _selectedQualityLabel,
-        colors: colors,
-        onSelect: (quality) {
-          Navigator.of(context).pop();
-          setState(() => _selectedQualityLabel = quality.label);
-          widget.onQualityChange(quality.label, quality.url);
-        },
-      ),
-    );
   }
 
   @override
@@ -703,13 +570,15 @@ class _WaveItemState extends ConsumerState<_WaveItem> {
                 const SizedBox(height: 16),
                 _ActionBtn(
                   icon: Icons.share_rounded,
-                  onTap: () {},
-                ),
-                const SizedBox(height: 16),
-                _QualityBtn(
-                  label: _selectedQualityLabel,
-                  colors: colors,
-                  onTap: _showQualitySheet,
+                  onTap: () {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Share coming soon'),
+                        behavior: SnackBarBehavior.floating,
+                        duration: Duration(seconds: 2),
+                      ),
+                    );
+                  },
                 ),
               ],
             ),
@@ -813,155 +682,3 @@ class _ActionBtn extends StatelessWidget {
   }
 }
 
-// ── Quality button ────────────────────────────────────────────────────────────
-
-class _QualityBtn extends StatelessWidget {
-  final String label;
-  final AppColorScheme colors;
-  final VoidCallback onTap;
-
-  const _QualityBtn({
-    required this.label,
-    required this.colors,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-            width: 46,
-            height: 46,
-            decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.2),
-              shape: BoxShape.circle,
-              border: Border.all(
-                color: Colors.white.withValues(alpha: 0.3),
-                width: 1.5,
-              ),
-            ),
-            child: const Icon(Icons.hd_rounded, color: Colors.white, size: 22),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            label,
-            style: const TextStyle(
-              color: Colors.white70,
-              fontSize: 10,
-              fontWeight: FontWeight.w600,
-              shadows: [Shadow(color: Colors.black54, blurRadius: 4)],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-// ── Quality picker sheet ──────────────────────────────────────────────────────
-
-class _QualitySheet extends StatefulWidget {
-  final String masterUrl;
-  final String selectedLabel;
-  final AppColorScheme colors;
-  final void Function(_HlsQuality) onSelect;
-
-  const _QualitySheet({
-    required this.masterUrl,
-    required this.selectedLabel,
-    required this.colors,
-    required this.onSelect,
-  });
-
-  @override
-  State<_QualitySheet> createState() => _QualitySheetState();
-}
-
-class _QualitySheetState extends State<_QualitySheet> {
-  List<_HlsQuality>? _qualities;
-  bool _loading = true;
-
-  @override
-  void initState() {
-    super.initState();
-    _load();
-  }
-
-  Future<void> _load() async {
-    try {
-      final qualities = await _parseQualities(widget.masterUrl);
-      if (mounted) setState(() { _qualities = qualities; _loading = false; });
-    } catch (_) {
-      if (mounted) {
-        setState(() {
-          _qualities = [_HlsQuality(label: 'Auto', url: widget.masterUrl, bandwidth: 0)];
-          _loading = false;
-        });
-      }
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return SafeArea(
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 8),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 36,
-              height: 4,
-              margin: const EdgeInsets.only(bottom: 16),
-              decoration: BoxDecoration(
-                color: Colors.white24,
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
-            const Text(
-              'Video Quality',
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 16,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-            const SizedBox(height: 12),
-            if (_loading)
-              const Padding(
-                padding: EdgeInsets.all(24),
-                child: CircularProgressIndicator(
-                  color: Colors.white54,
-                  strokeWidth: 2,
-                ),
-              )
-            else
-              ...(_qualities ?? []).map(
-                (q) => ListTile(
-                  title: Text(
-                    q.label,
-                    style: const TextStyle(color: Colors.white),
-                  ),
-                  subtitle: q.label == 'Auto'
-                      ? const Text(
-                          'Adjusts to your connection',
-                          style: TextStyle(color: Colors.white38, fontSize: 12),
-                        )
-                      : null,
-                  trailing: widget.selectedLabel == q.label
-                      ? Icon(Icons.check_rounded, color: widget.colors.primary)
-                      : null,
-                  onTap: () => widget.onSelect(q),
-                ),
-              ),
-            const SizedBox(height: 8),
-          ],
-        ),
-      ),
-    );
-  }
-}
