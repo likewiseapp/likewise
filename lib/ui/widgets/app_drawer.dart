@@ -220,6 +220,16 @@ class AppDrawer extends ConsumerWidget {
                         ref.read(selectedTabProvider.notifier).setTab(3);
                       },
                     ),
+                    _NavItem(
+                      icon: Icons.people_outline_rounded,
+                      label: 'Connections',
+                      colors: colors,
+                      isDark: isDark,
+                      onTap: () {
+                        Navigator.of(context).pop();
+                        context.push('/connections');
+                      },
+                    ),
                     Padding(
                       padding: const EdgeInsets.symmetric(vertical: 12),
                       child: Divider(

@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/scheduler.dart';
 import 'package:video_player/video_player.dart';
 
@@ -205,6 +207,41 @@ class WavePlayerManager {
     SchedulerBinding.instance.addPostFrameCallback((_) => old?.dispose());
 
     final controller = VideoPlayerController.networkUrl(Uri.parse(url), formatHint: VideoFormat.hls);
+    controllers[index] = controller;
+
+    try {
+      await controller.initialize();
+
+      if (!_isMounted() || controllers[index] != controller) {
+        controller.dispose();
+        return;
+      }
+
+      controller.setLooping(true);
+      if (index == currentIndex && isTabActive) controller.play();
+
+      _setState(() {});
+    } catch (_) {
+      if (controllers[index] == controller) controllers.remove(index);
+      controller.dispose();
+    }
+  }
+
+  /// Like [changeQuality] but loads from a local manifest file that preserves
+  /// the audio rendition reference from the master playlist.
+  Future<void> changeQualityFile(int index, String filePath) async {
+    if (index < 0 || index >= _waves.length) return;
+
+    final old = controllers[index];
+    old?.pause();
+    controllers.remove(index);
+    _setState(() {});
+    SchedulerBinding.instance.addPostFrameCallback((_) => old?.dispose());
+
+    final controller = VideoPlayerController.file(
+      File(filePath),
+      videoPlayerOptions: VideoPlayerOptions(mixWithOthers: true),
+    );
     controllers[index] = controller;
 
     try {

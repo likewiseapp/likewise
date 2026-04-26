@@ -197,29 +197,35 @@ class MessageService {
   }
 
   /// Find existing conversation between two users (checks both directions)
-  /// or create a new one. Returns the conversation ID, or null if permission
-  /// settings prevent the message.
-  Future<String?> getOrCreateConversation(
+  /// or create a new one. Returns `(conversationId, isExistingRequest)`.
+  /// conversationId is null if permission settings prevent the message.
+  /// isExistingRequest is true when a pending request already exists from this user.
+  Future<({String? id, bool isPendingRequest})> getOrCreateConversation(
       String userId, String otherUserId) async {
     // Check direction 1: userId = user1, otherUserId = user2
     final res1 = await _client
         .from('conversations')
-        .select('id')
+        .select('id, status')
         .eq('user1_id', userId)
         .eq('user2_id', otherUserId)
         .maybeSingle();
 
-    if (res1 != null) return res1['id'] as String;
+    if (res1 != null) {
+      final isPending = res1['status'] == 'request';
+      return (id: res1['id'] as String, isPendingRequest: isPending);
+    }
 
     // Check direction 2: otherUserId = user1, userId = user2
     final res2 = await _client
         .from('conversations')
-        .select('id')
+        .select('id, status')
         .eq('user1_id', otherUserId)
         .eq('user2_id', userId)
         .maybeSingle();
 
-    if (res2 != null) return res2['id'] as String;
+    if (res2 != null) {
+      return (id: res2['id'] as String, isPendingRequest: false);
+    }
 
     // No existing conversation — check recipient's message permission
     final profileData = await _client
@@ -230,7 +236,9 @@ class MessageService {
     final permission =
         profileData['message_permission'] as String? ?? 'everyone';
 
-    if (permission == 'none') return null;
+    if (permission == 'none') {
+      return (id: null, isPendingRequest: false);
+    }
 
     // Check if recipient follows sender
     final recipientFollowsSender = await _client
@@ -241,7 +249,7 @@ class MessageService {
         .maybeSingle();
 
     if (permission == 'followers_only' && recipientFollowsSender == null) {
-      return null;
+      return (id: null, isPendingRequest: false);
     }
 
     // 'request' if permission='everyone' but recipient doesn't follow sender
@@ -256,7 +264,7 @@ class MessageService {
       'status': status,
     }).select('id').single();
 
-    return inserted['id'] as String;
+    return (id: inserted['id'] as String, isPendingRequest: false);
   }
 
   /// Accept a message request by setting conversation status to 'active'.
@@ -307,9 +315,24 @@ class MessageService {
     return (result as List).isNotEmpty;
   }
 
-  /// Hard-delete a message for everyone — removes it from the backend entirely.
+  /// Soft-delete a message for the current user only.
+  /// Inserts into `message_deletions` so the message stays visible to the other user.
   Future<void> deleteMessageForMe(String messageId, String userId) async {
-    await _client.from('messages').delete().eq('id', messageId);
+    await _client.from('message_deletions').upsert(
+      {'message_id': messageId, 'user_id': userId},
+      onConflict: 'message_id,user_id',
+    );
+  }
+
+  /// Soft-delete a message for everyone by setting `deleted_at`.
+  /// Only the sender should call this.
+  Future<void> deleteMessageForEveryone(
+      String messageId, String senderId) async {
+    await _client
+        .from('messages')
+        .update({'deleted_at': DateTime.now().toUtc().toIso8601String()})
+        .eq('id', messageId)
+        .eq('sender_id', senderId);
   }
 
   /// Hard-delete a conversation and all its messages (cascade on backend).
@@ -318,10 +341,15 @@ class MessageService {
   }
 
   /// Fetch IDs of messages soft-deleted by this user in a conversation.
-  /// No longer used (delete is now hard), kept to avoid breaking callers.
   Future<Set<String>> fetchMyDeletions(
       String conversationId, String userId) async {
-    return {};
+    final data = await _client
+        .from('message_deletions')
+        .select('message_id')
+        .eq('user_id', userId);
+    return (data as List)
+        .map((e) => e['message_id'] as String)
+        .toSet();
   }
 
   /// Add an emoji reaction (upsert — one per user+emoji+message).

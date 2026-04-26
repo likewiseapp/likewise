@@ -54,11 +54,11 @@ class _NewChatScreenState extends ConsumerState<NewChatScreen> {
       final userId = ref.read(currentUserIdProvider);
       if (userId == null) return;
       final client = ref.read(supabaseProvider);
-      final conversationId =
+      final result =
           await MessageService(client).getOrCreateConversation(userId, user.id);
 
       if (!mounted) return;
-      if (conversationId == null) {
+      if (result.id == null) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('This user is not accepting messages'),
@@ -67,6 +67,16 @@ class _NewChatScreenState extends ConsumerState<NewChatScreen> {
         );
         return;
       }
+      if (result.isPendingRequest) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Request already sent, waiting for response'),
+            duration: Duration(seconds: 3),
+          ),
+        );
+        return;
+      }
+      final conversationId = result.id!;
       final name = Uri.encodeComponent(user.fullName);
       final avatar = Uri.encodeComponent(user.avatarUrl ?? '');
       final otherUserId = Uri.encodeComponent(user.id);

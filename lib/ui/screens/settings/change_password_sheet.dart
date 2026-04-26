@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../core/app_theme.dart';
@@ -214,6 +215,26 @@ class _ChangePasswordSheetState extends ConsumerState<_ChangePasswordSheet> {
                       HapticFeedback.lightImpact();
                       setState(() => _showCurrent = !_showCurrent);
                     },
+                  ),
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: GestureDetector(
+                      onTap: () {
+                        Navigator.of(context).pop();
+                        context.push('/forgot-password');
+                      },
+                      child: Padding(
+                        padding: const EdgeInsets.only(top: 8),
+                        child: Text(
+                          'Forgot your password?',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: colors.primary,
+                          ),
+                        ),
+                      ),
+                    ),
                   ),
                   const SizedBox(height: 14),
                   _PasswordField(

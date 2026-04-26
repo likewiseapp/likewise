@@ -6,10 +6,13 @@ class Message {
   final bool isRead;
   final DateTime? createdAt;
   final String? replyToId;
+  final DateTime? deletedAt;
 
   /// Local-only flags for optimistic UI (not persisted to DB).
   final bool isPending;
   final bool hasFailed;
+
+  bool get isDeletedForEveryone => deletedAt != null;
 
   const Message({
     required this.id,
@@ -19,6 +22,7 @@ class Message {
     this.isRead = false,
     this.createdAt,
     this.replyToId,
+    this.deletedAt,
     this.isPending = false,
     this.hasFailed = false,
   });
@@ -34,6 +38,9 @@ class Message {
           ? DateTime.tryParse(json['created_at'] as String)?.toLocal()
           : null,
       replyToId: json['reply_to_id'] as String?,
+      deletedAt: json['deleted_at'] != null
+          ? DateTime.tryParse(json['deleted_at'] as String)?.toLocal()
+          : null,
     );
   }
 
@@ -41,6 +48,7 @@ class Message {
     String? id,
     bool? isPending,
     bool? hasFailed,
+    DateTime? deletedAt,
   }) {
     return Message(
       id: id ?? this.id,
@@ -50,6 +58,7 @@ class Message {
       isRead: isRead,
       createdAt: createdAt,
       replyToId: replyToId,
+      deletedAt: deletedAt ?? this.deletedAt,
       isPending: isPending ?? this.isPending,
       hasFailed: hasFailed ?? this.hasFailed,
     );

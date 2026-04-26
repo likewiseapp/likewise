@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'dart:math' as math;
 
 import '../../../core/app_theme.dart';
 import '../../../core/models/hobby.dart';
@@ -320,10 +319,11 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                           Expanded(
                             child: _buildActionButton(
                               context,
-                              'Share Profile',
+                              'Connections',
                               isPrimary: false,
                               colors: colors,
                               isDark: isDark,
+                              onTap: () => context.push('/connections'),
                             ),
                           ),
                         ],
@@ -361,14 +361,35 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                 SliverToBoxAdapter(
                   child: Padding(
                     padding: const EdgeInsets.fromLTRB(24, 20, 24, 12),
-                    child: Text(
-                      'MY WAVES',
-                      style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w800,
-                        letterSpacing: 1.2,
-                        color: Colors.grey.shade500,
-                      ),
+                    child: Consumer(
+                      builder: (context, ref, _) {
+                        final waveCount = ref.watch(userWavesProvider(userId))
+                            .value?.length;
+                        return Row(
+                          children: [
+                            Text(
+                              'MY WAVES',
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w800,
+                                letterSpacing: 1.2,
+                                color: Colors.grey.shade500,
+                              ),
+                            ),
+                            if (waveCount != null && waveCount > 0) ...[
+                              const SizedBox(width: 6),
+                              Text(
+                                '$waveCount',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w700,
+                                  color: Colors.grey.shade400,
+                                ),
+                              ),
+                            ],
+                          ],
+                        );
+                      },
                     ),
                   ),
                 ),
@@ -509,8 +530,6 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     List<({String name, bool isPrimary})> hobbyEntries,
     List<Hobby> allHobbies,
   ) {
-    final random = math.Random(42);
-
     return Wrap(
       spacing: 8,
       runSpacing: 8,
@@ -519,57 +538,43 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
             allHobbies.where((h) => h.name == entry.name).firstOrNull;
         final color = hobby?.colorValue ?? colors.primary;
         final icon = hobby?.icon ?? '✨';
-        final rotation = (random.nextDouble() - 0.5) * 0.1;
 
-        return Transform.rotate(
-          angle: entry.isPrimary ? 0 : rotation,
-          child: Container(
-            padding: EdgeInsets.symmetric(
-              horizontal: entry.isPrimary ? 12 : 10,
-              vertical: entry.isPrimary ? 8 : 7,
+        return Container(
+          padding: EdgeInsets.symmetric(
+            horizontal: entry.isPrimary ? 12 : 10,
+            vertical: 6,
+          ),
+          decoration: BoxDecoration(
+            color: color.withValues(alpha: isDark ? 0.15 : 0.08),
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(
+              color: color.withValues(
+                  alpha: entry.isPrimary ? 0.5 : 0.25),
+              width: entry.isPrimary ? 1.5 : 1,
             ),
-            decoration: BoxDecoration(
-              color: entry.isPrimary
-                  ? color.withValues(alpha: isDark ? 0.25 : 0.12)
-                  : (isDark ? AppColors.darkSurface : Colors.white),
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(
-                color: color.withValues(
-                    alpha: entry.isPrimary ? 0.6 : 0.3),
-                width: entry.isPrimary ? 2 : 1.5,
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(icon,
+                  style:
+                      TextStyle(fontSize: entry.isPrimary ? 14 : 13)),
+              const SizedBox(width: 5),
+              Text(
+                entry.name,
+                style: TextStyle(
+                  fontWeight: FontWeight.w700,
+                  color: entry.isPrimary
+                      ? color
+                      : (isDark ? Colors.white : Colors.black87),
+                  fontSize: 12,
+                ),
               ),
-              boxShadow: [
-                BoxShadow(
-                  color: color.withValues(
-                      alpha: entry.isPrimary ? 0.22 : 0.12),
-                  blurRadius: entry.isPrimary ? 10 : 6,
-                  offset: const Offset(0, 3),
-                ),
+              if (entry.isPrimary) ...[
+                const SizedBox(width: 4),
+                Text('⭐', style: TextStyle(fontSize: 10)),
               ],
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(icon,
-                    style:
-                        TextStyle(fontSize: entry.isPrimary ? 15 : 14)),
-                const SizedBox(width: 6),
-                Text(
-                  entry.name,
-                  style: TextStyle(
-                    fontWeight: FontWeight.w800,
-                    color: entry.isPrimary
-                        ? color
-                        : (isDark ? Colors.white : Colors.black87),
-                    fontSize: entry.isPrimary ? 13 : 12,
-                  ),
-                ),
-                if (entry.isPrimary) ...[
-                  const SizedBox(width: 4),
-                  const Text('⭐', style: TextStyle(fontSize: 11)),
-                ],
-              ],
-            ),
+            ],
           ),
         );
       }).toList(),

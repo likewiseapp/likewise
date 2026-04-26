@@ -15,18 +15,25 @@ import '../../router.dart';
 // Defined at top-level so the background handler (separate isolate) can
 // reference them too.
 
+const _soundUri =
+    RawResourceAndroidNotificationSound('notification_sound');
+
 const AndroidNotificationChannel _defaultChannel = AndroidNotificationChannel(
-  'likewise_default',
+  'likewise_default_v2',
   'Likewise',
   description: 'General notifications',
   importance: Importance.high,
+  sound: _soundUri,
+  playSound: true,
 );
 
 const AndroidNotificationChannel _messagesChannel = AndroidNotificationChannel(
-  'likewise_messages',
+  'likewise_messages_v2',
   'Messages',
   description: 'New messages from your chats',
   importance: Importance.max,
+  sound: _soundUri,
+  playSound: true,
 );
 
 // ── Background handler ────────────────────────────────────────────────────
@@ -138,6 +145,12 @@ Future<void> _showRichMessageNotification(
         ticker: isMessage ? 'New message from $senderName' : null,
         styleInformation: styleInformation,
         visibility: NotificationVisibility.private,
+        sound: _soundUri,
+        playSound: true,
+      ),
+      iOS: const DarwinNotificationDetails(
+        sound: 'notification_sound.caf',
+        presentSound: true,
       ),
     ),
     payload: data.isEmpty ? null : jsonEncode(data),

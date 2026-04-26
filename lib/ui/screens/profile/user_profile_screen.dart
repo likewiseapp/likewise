@@ -1,5 +1,3 @@
-import 'dart:math' as math;
-
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -13,6 +11,7 @@ import '../../../core/providers/follow_providers.dart';
 import '../../../core/providers/hobby_providers.dart';
 import '../../../core/providers/notification_providers.dart';
 import '../../../core/providers/profile_providers.dart';
+import '../../../core/providers/wave_providers.dart';
 import '../../../core/services/block_service.dart';
 import '../../../core/services/follow_service.dart';
 import '../../../core/services/message_service.dart';
@@ -97,10 +96,10 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
 
     try {
       final client = ref.read(supabaseProvider);
-      final conversationId = await MessageService(client)
+      final result = await MessageService(client)
           .getOrCreateConversation(currentUserId, widget.userId);
       if (!mounted) return;
-      if (conversationId == null) {
+      if (result.id == null) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('This user is not accepting messages'),
@@ -109,6 +108,16 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
         );
         return;
       }
+      if (result.isPendingRequest) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Request already sent, waiting for response'),
+            duration: Duration(seconds: 3),
+          ),
+        );
+        return;
+      }
+      final conversationId = result.id!;
       final name = Uri.encodeComponent(otherName);
       final avatar = Uri.encodeComponent(otherAvatar);
       final uid = Uri.encodeComponent(widget.userId);
@@ -525,7 +534,7 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
 
                       const SizedBox(height: 16),
 
-                      // Stats row — dashes when blocked/private, non-tappable when blocked/private
+                      // Stats row
                       Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
@@ -697,62 +706,47 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
                 ),
               ],
 
-              // ── MY REELS ─────────────────────────────────────────────────
+              // ── WAVES ─────────────────────────────────────────────────
               if (!isBlockedByMe && !isProfileRestricted)
-              SliverToBoxAdapter(
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(24, 20, 24, 12),
-                  child: Text(
-                    'MY REELS',
-                    style: TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w800,
-                      letterSpacing: 1.2,
-                      color: Colors.grey.shade500,
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(24, 20, 24, 12),
+                    child: Consumer(
+                      builder: (context, ref, _) {
+                        final waveCount = ref.watch(
+                            userWavesProvider(widget.userId)).value?.length;
+                        return Row(
+                          children: [
+                            Text(
+                              'WAVES',
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w800,
+                                letterSpacing: 1.2,
+                                color: Colors.grey.shade500,
+                              ),
+                            ),
+                            if (waveCount != null && waveCount > 0) ...[
+                              const SizedBox(width: 6),
+                              Text(
+                                '$waveCount',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w700,
+                                  color: Colors.grey.shade400,
+                                ),
+                              ),
+                            ],
+                          ],
+                        );
+                      },
                     ),
                   ),
                 ),
-              ),
 
               if (!isBlockedByMe && !isProfileRestricted)
-              SliverToBoxAdapter(
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 24),
-                  child: Container(
-                    height: 160,
-                    decoration: BoxDecoration(
-                      color: isDark
-                          ? Colors.white.withValues(alpha: 0.04)
-                          : Colors.black.withValues(alpha: 0.03),
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(
-                        color: isDark
-                            ? Colors.white.withValues(alpha: 0.07)
-                            : Colors.black.withValues(alpha: 0.06),
-                      ),
-                    ),
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          Icons.videocam_outlined,
-                          size: 30,
-                          color: Colors.grey.shade500,
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          'No reels yet',
-                          style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w600,
-                            color: isDark ? Colors.white54 : Colors.black38,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
+                _UserWavesSection(
+                    userId: widget.userId, isDark: isDark),
 
               const SliverToBoxAdapter(child: SizedBox(height: 40)),
             ],
@@ -907,10 +901,6 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
     List<String> hobbyNames,
     List<Hobby> allHobbies,
   ) {
-    final random = math.Random(
-      widget.userId.codeUnits.fold<int>(0, (a, b) => a + b),
-    );
-
     return Wrap(
       spacing: 8,
       runSpacing: 8,
@@ -919,45 +909,201 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
             allHobbies.where((h) => h.name == hobbyName).firstOrNull;
         final color = hobby?.colorValue ?? colors.primary;
         final icon = hobby?.icon ?? '✨';
-        final rotation = (random.nextDouble() - 0.5) * 0.1;
 
-        return Transform.rotate(
-          angle: rotation,
-          child: Container(
-            padding:
-                const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
-            decoration: BoxDecoration(
-              color: isDark ? AppColors.darkSurface : Colors.white,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(
-                  color: color.withValues(alpha: 0.3), width: 2),
-              boxShadow: [
-                BoxShadow(
-                  color: color.withValues(alpha: 0.15),
-                  blurRadius: 8,
-                  offset: const Offset(0, 4),
-                ),
-              ],
+        return Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+          decoration: BoxDecoration(
+            color: color.withValues(alpha: isDark ? 0.15 : 0.08),
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(
+              color: color.withValues(alpha: 0.25),
             ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(icon, style: const TextStyle(fontSize: 14)),
-                const SizedBox(width: 8),
-                Text(
-                  hobbyName,
-                  style: TextStyle(
-                    fontWeight: FontWeight.w700,
-                    color: isDark ? Colors.white : Colors.black87,
-                    fontSize: 12,
-                  ),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(icon, style: const TextStyle(fontSize: 13)),
+              const SizedBox(width: 5),
+              Text(
+                hobbyName,
+                style: TextStyle(
+                  fontWeight: FontWeight.w700,
+                  color: isDark ? Colors.white : Colors.black87,
+                  fontSize: 12,
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
         );
       }).toList(),
     );
+  }
+}
+
+// ── User Waves Section ──────────────────────────────────────────────────────
+
+class _UserWavesSection extends ConsumerWidget {
+  final String userId;
+  final bool isDark;
+
+  const _UserWavesSection({required this.userId, required this.isDark});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final wavesAsync = ref.watch(userWavesProvider(userId));
+
+    return wavesAsync.when(
+      loading: () => SliverToBoxAdapter(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 24),
+          child: Container(
+            height: 120,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: isDark
+                  ? Colors.white.withValues(alpha: 0.04)
+                  : Colors.black.withValues(alpha: 0.03),
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: const CircularProgressIndicator(strokeWidth: 2.5),
+          ),
+        ),
+      ),
+      error: (_, __) => SliverToBoxAdapter(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 24),
+          child: Container(
+            height: 120,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: isDark
+                  ? Colors.white.withValues(alpha: 0.04)
+                  : Colors.black.withValues(alpha: 0.03),
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: Text(
+              'Couldn\'t load waves',
+              style: TextStyle(color: Colors.grey.shade500, fontSize: 13),
+            ),
+          ),
+        ),
+      ),
+      data: (waves) {
+        if (waves.isEmpty) {
+          return SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 24),
+              child: Container(
+                height: 160,
+                decoration: BoxDecoration(
+                  color: isDark
+                      ? Colors.white.withValues(alpha: 0.04)
+                      : Colors.black.withValues(alpha: 0.03),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(
+                    color: isDark
+                        ? Colors.white.withValues(alpha: 0.07)
+                        : Colors.black.withValues(alpha: 0.06),
+                  ),
+                ),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.videocam_outlined,
+                        size: 30, color: Colors.grey.shade500),
+                    const SizedBox(height: 8),
+                    Text(
+                      'No waves yet',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: isDark ? Colors.white54 : Colors.black38,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          );
+        }
+
+        return SliverPadding(
+          padding: const EdgeInsets.symmetric(horizontal: 24),
+          sliver: SliverGrid(
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 3,
+              mainAxisSpacing: 6,
+              crossAxisSpacing: 6,
+              childAspectRatio: 9 / 16,
+            ),
+            delegate: SliverChildBuilderDelegate(
+              (context, index) {
+                final wave = waves[index];
+                return ClipRRect(
+                  borderRadius: BorderRadius.circular(10),
+                  child: Stack(
+                    fit: StackFit.expand,
+                    children: [
+                      AppCachedImage(
+                        imageUrl: wave.thumbnailUrl,
+                        fit: BoxFit.cover,
+                        errorWidget: Container(
+                          color: Colors.grey.shade900,
+                          child: const Icon(Icons.videocam_outlined,
+                              color: Colors.white24),
+                        ),
+                      ),
+                      const DecoratedBox(
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment.topCenter,
+                            end: Alignment.bottomCenter,
+                            colors: [Colors.transparent, Colors.black54],
+                            stops: [0.55, 1.0],
+                          ),
+                        ),
+                      ),
+                      Positioned(
+                        left: 6,
+                        bottom: 5,
+                        child: Row(
+                          children: [
+                            const Icon(Icons.play_arrow_rounded,
+                                size: 14, color: Colors.white),
+                            const SizedBox(width: 2),
+                            Text(
+                              _compactCount(wave.viewCount),
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 11,
+                                fontWeight: FontWeight.w700,
+                                shadows: [
+                                  Shadow(
+                                      color: Colors.black54, blurRadius: 3)
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              },
+              childCount: waves.length,
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  String _compactCount(int n) {
+    if (n < 1000) return n.toString();
+    final k = n / 1000;
+    if (k < 10) return '${k.toStringAsFixed(1)}k';
+    if (k < 1000) return '${k.toStringAsFixed(0)}k';
+    return '${(n / 1000000).toStringAsFixed(1)}M';
   }
 }
 

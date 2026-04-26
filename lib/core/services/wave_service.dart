@@ -139,6 +139,64 @@ class WaveService {
     }
   }
 
+  /// Fetch waves filtered to only show posters who share at least one hobby
+  /// with the given [hobbyIds] list.
+  Future<List<Wave>> fetchWavesByHobbies(List<int> hobbyIds) async {
+    if (hobbyIds.isEmpty) return fetchWaves();
+
+    final viewerId = _client.auth.currentUser?.id;
+
+    // Get user IDs that have at least one of the given hobbies
+    final hobbyUsers = await _client
+        .from('user_hobbies')
+        .select('user_id')
+        .inFilter('hobby_id', hobbyIds);
+    final matchedUserIds =
+        (hobbyUsers as List).map((e) => e['user_id'] as String).toSet();
+
+    if (matchedUserIds.isEmpty) return [];
+
+    var query = _client.from('waves').select(
+          'id, user_id, video_id, video_url, raw_video_url, thumbnail_url, '
+          'caption, created_at, status, transcoding_ready, approved_at, '
+          'view_count, like_count, comment_count, '
+          'wave_likes (user_id)',
+        );
+
+    if (viewerId != null) {
+      query = query.eq('wave_likes.user_id', viewerId);
+    }
+
+    final rows = await query
+        .inFilter('user_id', matchedUserIds.toList())
+        .eq('status', 'approved')
+        .eq('transcoding_ready', true)
+        .order('created_at', ascending: false) as List;
+
+    if (rows.isEmpty) return [];
+
+    final userIds =
+        rows.map((r) => r['user_id'] as String).toSet().toList();
+
+    final profileRows = await _client
+        .from('profiles')
+        .select('id, username, full_name, avatar_url')
+        .inFilter('id', userIds) as List;
+
+    final profileMap = {
+      for (final p in profileRows)
+        p['id'] as String: p as Map<String, dynamic>,
+    };
+
+    return rows.map((row) {
+      final merged = <String, dynamic>{
+        ...row as Map<String, dynamic>,
+        'profiles': profileMap[row['user_id']],
+      };
+      return Wave.fromJson(merged);
+    }).toList();
+  }
+
   Future<void> deleteWave(String waveId) async {
     await _client.from('waves').delete().eq('id', waveId);
   }

@@ -19,8 +19,9 @@ class UploadWaveScreen extends ConsumerStatefulWidget {
 class _UploadWaveScreenState extends ConsumerState<UploadWaveScreen> {
   bool _busy = false;
 
-  static const int _maxFileSizeBytes = 150 * 1024 * 1024; // 150 MB
-  static const Duration _maxDuration = Duration(seconds: 62); // 1 min 2 sec
+  static const int _maxFileSizeBytes = 150 * 1024 * 1024;
+  static const Duration _maxRecordDuration = Duration(minutes: 1);
+  static const Duration _maxTrimDuration = Duration(seconds: 60);
 
   @override
   void initState() {
@@ -61,7 +62,7 @@ class _UploadWaveScreenState extends ConsumerState<UploadWaveScreen> {
               ),
               const SizedBox(height: 4),
               const Text(
-                'Max 1 min 2 sec · 150 MB',
+                'Max 1 min · 150 MB',
                 style: TextStyle(color: Colors.white38, fontSize: 12),
               ),
               const SizedBox(height: 16),
@@ -101,8 +102,7 @@ class _UploadWaveScreenState extends ConsumerState<UploadWaveScreen> {
 
     final picked = await ImagePicker().pickVideo(
       source: source,
-      // Enforces 2-min cap at the OS camera level when recording
-      maxDuration: _maxDuration,
+      maxDuration: source == ImageSource.camera ? _maxRecordDuration : null,
     );
 
     if (!mounted) return;
@@ -123,50 +123,22 @@ class _UploadWaveScreenState extends ConsumerState<UploadWaveScreen> {
         return;
       }
 
-      if (meta.duration > _maxDuration) {
-        _showDurationError();
-        return;
-      }
+      final clampedEnd = meta.duration > _maxTrimDuration
+          ? _maxTrimDuration
+          : meta.duration;
 
       final editState = WaveEditState(
         videoPath: picked.path,
         videoDuration: meta.duration,
         videoResolution: meta.resolution,
         trimStart: Duration.zero,
-        trimEnd: meta.duration,
+        trimEnd: clampedEnd,
       );
 
       context.pushReplacement('/wave-editor', extra: editState);
     } catch (_) {
       if (mounted) context.pop();
     }
-  }
-
-  void _showDurationError() {
-    final colors = ref.read(appColorSchemeProvider);
-    showDialog<void>(
-      context: context,
-      builder: (_) => AlertDialog(
-        backgroundColor: const Color(0xFF1C1C1E),
-        title: const Text(
-          'Video too long',
-          style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700),
-        ),
-        content: const Text(
-          'Videos must be 1 minute 2 seconds or less.',
-          style: TextStyle(color: Colors.white70),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () {
-              Navigator.of(context).pop();
-              context.pop();
-            },
-            child: Text('OK', style: TextStyle(color: colors.primary)),
-          ),
-        ],
-      ),
-    );
   }
 
   void _showSizeError() {

@@ -259,6 +259,8 @@ class _TrimPanel extends StatelessWidget {
   final void Function(WaveEditState) onChanged;
   final String Function(Duration) formatDuration;
 
+  static const _maxClip = Duration(seconds: 60);
+
   const _TrimPanel({
     required this.state,
     required this.keyframes,
@@ -271,6 +273,8 @@ class _TrimPanel extends StatelessWidget {
     final totalMs = state.videoDuration.inMilliseconds.toDouble();
     final startMs = state.trimStart.inMilliseconds.toDouble();
     final endMs = state.trimEnd.inMilliseconds.toDouble();
+    final clipDuration = state.trimEnd - state.trimStart;
+    final overLimit = clipDuration > _maxClip;
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
@@ -305,10 +309,18 @@ class _TrimPanel extends StatelessWidget {
               min: 0,
               max: totalMs,
               values: RangeValues(startMs, endMs),
-              onChanged: (vals) => onChanged(state.copyWith(
-                trimStart: Duration(milliseconds: vals.start.toInt()),
-                trimEnd: Duration(milliseconds: vals.end.toInt()),
-              )),
+              onChanged: (vals) {
+                var start = Duration(milliseconds: vals.start.toInt());
+                var end = Duration(milliseconds: vals.end.toInt());
+                if (end - start > _maxClip) {
+                  if (start != state.trimStart) {
+                    start = end - _maxClip;
+                  } else {
+                    end = start + _maxClip;
+                  }
+                }
+                onChanged(state.copyWith(trimStart: start, trimEnd: end));
+              },
             ),
           ),
           Row(
@@ -317,8 +329,11 @@ class _TrimPanel extends StatelessWidget {
               Text(formatDuration(state.trimStart),
                   style: const TextStyle(color: Colors.white70, fontSize: 12)),
               Text(
-                'Clip: ${formatDuration(state.trimEnd - state.trimStart)}',
-                style: const TextStyle(color: Colors.white38, fontSize: 12),
+                'Clip: ${formatDuration(clipDuration)}${overLimit ? ' (max 1 min)' : ''}',
+                style: TextStyle(
+                  color: overLimit ? Colors.redAccent : Colors.white38,
+                  fontSize: 12,
+                ),
               ),
               Text(formatDuration(state.trimEnd),
                   style: const TextStyle(color: Colors.white70, fontSize: 12)),

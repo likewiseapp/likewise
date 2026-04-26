@@ -35,8 +35,39 @@ class _UploadProgressNotifier extends Notifier<double> {
   void set(double value) => state = value;
 }
 
+/// When true, the wave feed only shows waves from posters who share
+/// at least one hobby with the current user.
+class _WaveHobbyFilterNotifier extends Notifier<bool> {
+  @override
+  bool build() => false;
+
+  void toggle() => state = !state;
+}
+
+final waveHobbyFilterProvider =
+    NotifierProvider<_WaveHobbyFilterNotifier, bool>(
+  _WaveHobbyFilterNotifier.new,
+);
+
 final wavesProvider = FutureProvider<List<Wave>>((ref) async {
   final client = ref.watch(supabaseProvider);
+  final filterByHobby = ref.watch(waveHobbyFilterProvider);
+
+  if (filterByHobby) {
+    final userId = ref.read(currentUserIdProvider);
+    if (userId != null) {
+      final hobbies = await client
+          .from('user_hobbies')
+          .select('hobby_id')
+          .eq('user_id', userId);
+      final hobbyIds =
+          (hobbies as List).map((e) => e['hobby_id'] as int).toList();
+      if (hobbyIds.isNotEmpty) {
+        return WaveService(client).fetchWavesByHobbies(hobbyIds);
+      }
+    }
+  }
+
   return WaveService(client).fetchWaves();
 });
 

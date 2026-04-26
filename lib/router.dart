@@ -224,6 +224,17 @@ final routerProvider = Provider<GoRouter>((ref) {
         },
       ),
       GoRoute(
+        path: '/connections',
+        builder: (context, state) {
+          final userId =
+              Supabase.instance.client.auth.currentUser!.id;
+          return FollowListScreen(
+            userId: userId,
+            userName: 'Connections',
+          );
+        },
+      ),
+      GoRoute(
         path: '/follow-list/:id/:tab',
         builder: (context, state) {
           final userId = state.pathParameters['id']!;
@@ -256,26 +267,15 @@ class _SplashScreen extends ConsumerWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Container(
-              width: 72,
-              height: 72,
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [colors.primary, colors.accent],
-                ),
-                borderRadius: BorderRadius.circular(20),
-                boxShadow: [
-                  BoxShadow(
-                    color: colors.primary.withValues(alpha: 0.3),
-                    blurRadius: 20,
-                    offset: const Offset(0, 8),
-                  ),
-                ],
-              ),
-              child: const Icon(
-                Icons.people_alt_rounded,
-                color: Colors.white,
-                size: 36,
+            ClipRRect(
+              borderRadius: BorderRadius.circular(22),
+              child: Image.asset(
+                'assets/icon.png',
+                width: 90,
+                height: 90,
+                fit: BoxFit.cover,
+                filterQuality: FilterQuality.high,
+                cacheWidth: 270,
               ),
             ),
             const SizedBox(height: 20),

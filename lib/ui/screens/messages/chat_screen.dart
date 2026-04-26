@@ -70,6 +70,18 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     _isRequest = widget.isRequest;
     _markRead();
     _controller.addListener(_onControllerChanged);
+    _loadMyDeletions();
+  }
+
+  Future<void> _loadMyDeletions() async {
+    final userId = ref.read(currentUserIdProvider);
+    if (userId == null) return;
+    final client = ref.read(supabaseProvider);
+    final ids = await MessageService(client)
+        .fetchMyDeletions(widget.conversationId, userId);
+    if (mounted && ids.isNotEmpty) {
+      setState(() => _deletedIds = {..._deletedIds, ...ids});
+    }
   }
 
   @override
@@ -325,9 +337,15 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     final userId = ref.read(currentUserIdProvider);
     if (userId == null) return;
     final client = ref.read(supabaseProvider);
-    // Optimistic
     setState(() => _deletedIds = {..._deletedIds, msg.id});
     await MessageService(client).deleteMessageForMe(msg.id, userId);
+  }
+
+  Future<void> _onDeleteForEveryone(Message msg) async {
+    final userId = ref.read(currentUserIdProvider);
+    if (userId == null || msg.senderId != userId) return;
+    final client = ref.read(supabaseProvider);
+    await MessageService(client).deleteMessageForEveryone(msg.id, userId);
   }
 
   void _onReply(Message msg) {
@@ -402,11 +420,16 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
         isMine: isMine,
         colors: colors,
         isDark: isDark,
-        onCopy: () { Navigator.pop(ctx); _onCopy(msg); },
-        onReply: isMine ? null : () { Navigator.pop(ctx); _onReply(msg); },
-        onUnsend: isMine && !msg.isRead ? () { Navigator.pop(ctx); _onUnsend(msg); } : null,
+        onCopy: msg.isDeletedForEveryone ? null : () { Navigator.pop(ctx); _onCopy(msg); },
+        onReply: isMine || msg.isDeletedForEveryone ? null : () { Navigator.pop(ctx); _onReply(msg); },
+        onUnsend: isMine && !msg.isRead && !msg.isDeletedForEveryone
+            ? () { Navigator.pop(ctx); _onUnsend(msg); }
+            : null,
         onDeleteForMe: () { Navigator.pop(ctx); _onDeleteForMe(msg); },
-        onReact: isMine
+        onDeleteForEveryone: isMine && !msg.isDeletedForEveryone
+            ? () { Navigator.pop(ctx); _onDeleteForEveryone(msg); }
+            : null,
+        onReact: isMine || msg.isDeletedForEveryone
             ? null
             : (emoji) { Navigator.pop(ctx); _onReact(msg, emoji); },
       ),
@@ -1252,6 +1275,35 @@ class _Bubble extends StatelessWidget {
                         crossAxisAlignment: WrapCrossAlignment.end,
                         spacing: 6,
                         children: [
+                          if (message.isDeletedForEveryone)
+                            Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  Icons.block_rounded,
+                                  size: 14,
+                                  color: isMine
+                                      ? Colors.white60
+                                      : isDark
+                                          ? Colors.white38
+                                          : Colors.black38,
+                                ),
+                                const SizedBox(width: 4),
+                                Text(
+                                  'This message was deleted',
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    fontStyle: FontStyle.italic,
+                                    color: isMine
+                                        ? Colors.white60
+                                        : isDark
+                                            ? Colors.white38
+                                            : Colors.black38,
+                                  ),
+                                ),
+                              ],
+                            )
+                          else
                           Text(
                             message.content,
                             style: TextStyle(
@@ -1671,10 +1723,11 @@ class _MessageActionsSheet extends StatelessWidget {
   final bool isMine;
   final AppColorScheme colors;
   final bool isDark;
-  final VoidCallback onCopy;
+  final VoidCallback? onCopy;
   final VoidCallback? onReply;
   final VoidCallback? onUnsend;
   final VoidCallback onDeleteForMe;
+  final VoidCallback? onDeleteForEveryone;
   final void Function(String emoji)? onReact;
 
   const _MessageActionsSheet({
@@ -1682,10 +1735,11 @@ class _MessageActionsSheet extends StatelessWidget {
     required this.isMine,
     required this.colors,
     required this.isDark,
-    required this.onCopy,
+    this.onCopy,
     this.onReply,
     this.onUnsend,
     required this.onDeleteForMe,
+    this.onDeleteForEveryone,
     this.onReact,
   });
 
@@ -1772,13 +1826,14 @@ class _MessageActionsSheet extends StatelessWidget {
                     isDark: isDark,
                     onTap: onReply!,
                   ),
-                _ActionTile(
-                  icon: Icons.copy_rounded,
-                  label: 'Copy',
-                  colors: colors,
-                  isDark: isDark,
-                  onTap: onCopy,
-                ),
+                if (onCopy != null)
+                  _ActionTile(
+                    icon: Icons.copy_rounded,
+                    label: 'Copy',
+                    colors: colors,
+                    isDark: isDark,
+                    onTap: onCopy!,
+                  ),
                 _ActionTile(
                   icon: Icons.delete_outline_rounded,
                   label: 'Delete for me',
@@ -1786,6 +1841,15 @@ class _MessageActionsSheet extends StatelessWidget {
                   isDark: isDark,
                   onTap: onDeleteForMe,
                 ),
+                if (onDeleteForEveryone != null)
+                  _ActionTile(
+                    icon: Icons.delete_forever_rounded,
+                    label: 'Delete for everyone',
+                    colors: colors,
+                    isDark: isDark,
+                    onTap: onDeleteForEveryone!,
+                    isDestructive: true,
+                  ),
                 if (onUnsend != null)
                   _ActionTile(
                     icon: Icons.undo_rounded,
