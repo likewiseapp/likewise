@@ -8,6 +8,8 @@ import 'package:pro_video_editor/pro_video_editor.dart';
 import 'package:video_player/video_player.dart';
 
 import '../../../core/models/wave_edit_state.dart';
+import '../../../core/providers/auth_providers.dart';
+import '../../../core/providers/profile_providers.dart';
 import '../../../core/providers/wave_providers.dart';
 import '../../../core/theme_provider.dart';
 
@@ -30,6 +32,7 @@ class _WaveCaptionScreenState extends ConsumerState<WaveCaptionScreen> {
   String? _renderError;
   bool _uploadStarted = false;
   final _taskId = 'wave_${DateTime.now().millisecondsSinceEpoch}';
+  int? _selectedHobbyId;
 
   @override
   void initState() {
@@ -105,13 +108,12 @@ class _WaveCaptionScreenState extends ConsumerState<WaveCaptionScreen> {
   }
 
   void _post() {
-    if (_renderedPath == null) return;
+    if (_renderedPath == null || _selectedHobbyId == null) return;
     _uploadStarted = true;
-    // Fire upload in the background provider, then navigate home immediately.
-    // The banner on the main screen will track progress.
     ref.read(waveUploadProvider.notifier).upload(
           File(_renderedPath!),
           _captionCtrl.text.trim(),
+          hobbyId: _selectedHobbyId!,
         );
     context.go('/');
   }
@@ -129,6 +131,93 @@ class _WaveCaptionScreenState extends ConsumerState<WaveCaptionScreen> {
       } catch (_) {}
     }
     super.dispose();
+  }
+
+  Widget _buildHobbyPicker(dynamic colors) {
+    final userId = ref.watch(currentUserIdProvider);
+    if (userId == null) return const SizedBox.shrink();
+
+    final hobbiesAsync = ref.watch(userHobbiesProvider(userId));
+
+    return hobbiesAsync.when(
+      loading: () => const SizedBox(
+        height: 40,
+        child: Center(
+          child: SizedBox(
+            width: 20,
+            height: 20,
+            child: CircularProgressIndicator(
+              strokeWidth: 2,
+              color: Colors.white38,
+            ),
+          ),
+        ),
+      ),
+      error: (_, __) => const SizedBox.shrink(),
+      data: (userHobbies) {
+        if (userHobbies.isEmpty) return const SizedBox.shrink();
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Select talent',
+              style: TextStyle(
+                color: Colors.white70,
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: userHobbies.map((uh) {
+                final hobby = uh.hobby;
+                if (hobby == null) return const SizedBox.shrink();
+                final selected = _selectedHobbyId == hobby.id;
+                return GestureDetector(
+                  onTap: _isRendering
+                      ? null
+                      : () => setState(() => _selectedHobbyId = hobby.id),
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 200),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: selected
+                          ? hobby.colorValue.withValues(alpha: 0.25)
+                          : Colors.white10,
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(
+                        color: selected ? hobby.colorValue : Colors.white24,
+                        width: selected ? 1.5 : 1,
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(hobby.icon, style: const TextStyle(fontSize: 16)),
+                        const SizedBox(width: 6),
+                        Text(
+                          hobby.name,
+                          style: TextStyle(
+                            color: selected ? Colors.white : Colors.white70,
+                            fontSize: 13,
+                            fontWeight:
+                                selected ? FontWeight.w600 : FontWeight.w400,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              }).toList(),
+            ),
+          ],
+        );
+      },
+    );
   }
 
   @override
@@ -279,38 +368,42 @@ class _WaveCaptionScreenState extends ConsumerState<WaveCaptionScreen> {
                       ),
                     ),
                   ),
-                  const SizedBox(height: 12),
+                  const SizedBox(height: 14),
+
+                  // Hobby picker — user's own hobbies only
+                  _buildHobbyPicker(colors),
+
+                  const SizedBox(height: 14),
 
                   // Post button
                   SizedBox(
                     height: 52,
-                    child: DecoratedBox(
-                      decoration: BoxDecoration(
-                        gradient: (!_isRendering && _renderError == null)
-                            ? LinearGradient(
-                                colors: [colors.primary, colors.accent])
-                            : null,
-                        color: (_isRendering || _renderError != null)
-                            ? Colors.white12
-                            : null,
-                        borderRadius: BorderRadius.circular(14),
-                      ),
-                      child: TextButton(
-                        onPressed: (!_isRendering && _renderError == null)
-                            ? _post
-                            : null,
-                        child: Text(
-                          _isRendering ? 'Processing...' : 'Post Wave',
-                          style: TextStyle(
-                            color: (!_isRendering && _renderError == null)
-                                ? Colors.white
-                                : Colors.white38,
-                            fontWeight: FontWeight.w700,
-                            fontSize: 16,
+                    child: Builder(builder: (context) {
+                      final canPost = !_isRendering &&
+                          _renderError == null &&
+                          _selectedHobbyId != null;
+                      return DecoratedBox(
+                        decoration: BoxDecoration(
+                          gradient: canPost
+                              ? LinearGradient(
+                                  colors: [colors.primary, colors.accent])
+                              : null,
+                          color: canPost ? null : Colors.white12,
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                        child: TextButton(
+                          onPressed: canPost ? _post : null,
+                          child: Text(
+                            _isRendering ? 'Processing...' : 'Post Wave',
+                            style: TextStyle(
+                              color: canPost ? Colors.white : Colors.white38,
+                              fontWeight: FontWeight.w700,
+                              fontSize: 16,
+                            ),
                           ),
                         ),
-                      ),
-                    ),
+                      );
+                    }),
                   ),
 
                   const SizedBox(height: 8),

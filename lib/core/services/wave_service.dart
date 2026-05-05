@@ -16,21 +16,43 @@ class WaveService {
   /// Approved + transcoding-ready waves for a specific user, newest first.
   /// Used by profile screens (own profile = "My waves", others' profiles).
   Future<List<Wave>> fetchWavesByUser(String userId) async {
-    final rows = await _client
+    final viewerId = _client.auth.currentUser?.id;
+
+    var query = _client
         .from('waves')
         .select(
           'id, user_id, video_id, video_url, raw_video_url, thumbnail_url, '
           'caption, created_at, status, transcoding_ready, approved_at, '
-          'view_count, like_count, comment_count',
-        )
+          'view_count, like_count, comment_count, hobby_id, '
+          'wave_likes (user_id)',
+        );
+
+    if (viewerId != null) {
+      query = query.eq('wave_likes.user_id', viewerId);
+    }
+
+    final rows = await query
         .eq('user_id', userId)
         .eq('status', 'approved')
         .eq('transcoding_ready', true)
         .order('created_at', ascending: false) as List;
 
-    return rows
-        .map((r) => Wave.fromJson(r as Map<String, dynamic>))
-        .toList();
+    if (rows.isEmpty) return [];
+
+    final profileRows = await _client
+        .from('profiles')
+        .select('id, username, full_name, avatar_url')
+        .eq('id', userId) as List;
+
+    final profile = profileRows.isNotEmpty ? profileRows.first : null;
+
+    return rows.map((row) {
+      final merged = <String, dynamic>{
+        ...row as Map<String, dynamic>,
+        'profiles': profile,
+      };
+      return Wave.fromJson(merged);
+    }).toList();
   }
 
   Future<List<Wave>> fetchWaves() async {
@@ -42,7 +64,7 @@ class WaveService {
     var query = _client.from('waves').select(
           'id, user_id, video_id, video_url, raw_video_url, thumbnail_url, '
           'caption, created_at, status, transcoding_ready, approved_at, '
-          'view_count, like_count, comment_count, '
+          'view_count, like_count, comment_count, hobby_id, '
           'wave_likes (user_id)',
         );
 
@@ -88,6 +110,7 @@ class WaveService {
     File videoFile,
     String caption,
     String userId, {
+    required int hobbyId,
     void Function(double progress)? onCompressProgress,
     void Function(double progress)? onUploadProgress,
   }) async {
@@ -130,6 +153,7 @@ class WaveService {
         'user_id': userId,
         'raw_video_url': BunnyService.cdnUrl(path),
         'caption': caption,
+        'hobby_id': hobbyId,
         'status': 'pending',
       });
     } finally {
@@ -159,7 +183,7 @@ class WaveService {
     var query = _client.from('waves').select(
           'id, user_id, video_id, video_url, raw_video_url, thumbnail_url, '
           'caption, created_at, status, transcoding_ready, approved_at, '
-          'view_count, like_count, comment_count, '
+          'view_count, like_count, comment_count, hobby_id, '
           'wave_likes (user_id)',
         );
 
@@ -172,6 +196,101 @@ class WaveService {
         .eq('status', 'approved')
         .eq('transcoding_ready', true)
         .order('created_at', ascending: false) as List;
+
+    if (rows.isEmpty) return [];
+
+    final userIds =
+        rows.map((r) => r['user_id'] as String).toSet().toList();
+
+    final profileRows = await _client
+        .from('profiles')
+        .select('id, username, full_name, avatar_url')
+        .inFilter('id', userIds) as List;
+
+    final profileMap = {
+      for (final p in profileRows)
+        p['id'] as String: p as Map<String, dynamic>,
+    };
+
+    return rows.map((row) {
+      final merged = <String, dynamic>{
+        ...row as Map<String, dynamic>,
+        'profiles': profileMap[row['user_id']],
+      };
+      return Wave.fromJson(merged);
+    }).toList();
+  }
+
+  Future<List<Wave>> fetchWavesByHobbyId(int hobbyId) async {
+    final viewerId = _client.auth.currentUser?.id;
+
+    var query = _client.from('waves').select(
+          'id, user_id, video_id, video_url, raw_video_url, thumbnail_url, '
+          'caption, created_at, status, transcoding_ready, approved_at, '
+          'view_count, like_count, comment_count, hobby_id, '
+          'wave_likes (user_id)',
+        );
+
+    if (viewerId != null) {
+      query = query.eq('wave_likes.user_id', viewerId);
+    }
+
+    final rows = await query
+        .eq('hobby_id', hobbyId)
+        .eq('status', 'approved')
+        .eq('transcoding_ready', true)
+        .order('created_at', ascending: false) as List;
+
+    if (rows.isEmpty) return [];
+
+    final userIds =
+        rows.map((r) => r['user_id'] as String).toSet().toList();
+
+    final profileRows = await _client
+        .from('profiles')
+        .select('id, username, full_name, avatar_url')
+        .inFilter('id', userIds) as List;
+
+    final profileMap = {
+      for (final p in profileRows)
+        p['id'] as String: p as Map<String, dynamic>,
+    };
+
+    return rows.map((row) {
+      final merged = <String, dynamic>{
+        ...row as Map<String, dynamic>,
+        'profiles': profileMap[row['user_id']],
+      };
+      return Wave.fromJson(merged);
+    }).toList();
+  }
+
+  Future<List<Wave>> searchWaves(String query) async {
+    final viewerId = _client.auth.currentUser?.id;
+
+    // Fetch all approved waves with their hobby info
+    var waveQuery = _client.from('waves').select(
+          'id, user_id, video_id, video_url, raw_video_url, thumbnail_url, '
+          'caption, created_at, status, transcoding_ready, approved_at, '
+          'view_count, like_count, comment_count, hobby_id, '
+          'wave_likes (user_id)',
+        );
+
+    if (viewerId != null) {
+      waveQuery = waveQuery.eq('wave_likes.user_id', viewerId);
+    }
+
+    waveQuery = waveQuery
+        .eq('status', 'approved')
+        .eq('transcoding_ready', true);
+
+    if (query.isNotEmpty) {
+      waveQuery = waveQuery.ilike('caption', '%$query%');
+    }
+
+    final rows = await waveQuery
+        .order('created_at', ascending: false)
+        .limit(50) as List;
 
     if (rows.isEmpty) return [];
 

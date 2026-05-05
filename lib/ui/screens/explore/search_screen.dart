@@ -7,12 +7,16 @@ import '../../../core/models/matched_user.dart';
 import '../../../core/models/user_hobby.dart';
 import '../../../core/providers/auth_providers.dart';
 import '../../../core/providers/explore_providers.dart';
+import '../../../core/providers/hobby_providers.dart';
 import '../../../core/providers/profile_providers.dart';
+import '../../../core/providers/wave_providers.dart';
 import '../../../core/theme_provider.dart';
+import '../../widgets/app_cached_image.dart';
 import '../../widgets/search/search_header.dart';
 import '../../widgets/search/search_asymmetric_grid.dart';
 import '../../widgets/search/search_filter_sheet.dart';
 import '../../widgets/search/search_user_list_tile.dart';
+import '../waves/user_waves_viewer.dart';
 
 // ═════════════════════════════════════════════════════════════════════════════
 // Search Screen
@@ -30,6 +34,9 @@ class _SearchScreenState extends ConsumerState<SearchScreen>
   final TextEditingController _searchController = TextEditingController();
   final FocusNode _searchFocusNode = FocusNode();
   final ScrollController _scrollController = ScrollController();
+
+  int _searchMode = 0; // 0 = People, 1 = Waves
+  String _waveQuery = '';
 
   /// Extra hobbies added via the filter sheet (beyond the user's own).
   List<String> _extraFilterHobbies = [];
@@ -208,9 +215,12 @@ class _SearchScreenState extends ConsumerState<SearchScreen>
       }
     }
     final topPadding = MediaQuery.of(context).padding.top;
-    // Search mode: no tags row → smaller header
-    // Grid mode: 12 (top) + 48 (search) + 12 (gap) + 34 (tags) + 12 (bottom)
-    final headerHeight = isSearching ? topPadding + 72.0 : topPadding + 118.0;
+    // Toggle + search + optional tags
+    final headerHeight = _searchMode == 1
+        ? topPadding + 110.0
+        : isSearching
+            ? topPadding + 110.0
+            : topPadding + 152.0;
 
     return Scaffold(
       body: FadeTransition(
@@ -223,6 +233,8 @@ class _SearchScreenState extends ConsumerState<SearchScreen>
               physics: const BouncingScrollPhysics(),
               slivers: [
                 SliverToBoxAdapter(child: SizedBox(height: headerHeight)),
+
+                if (_searchMode == 0) ...[
 
                 // Distance active chip (hobbies shown in tag strip above)
                 if (_searchDistance != 500.0)
@@ -277,6 +289,14 @@ class _SearchScreenState extends ConsumerState<SearchScreen>
                   ),
                 ),
 
+                ], // end People mode
+
+                // ── Waves mode ──────────────────────────────────────────
+                if (_searchMode == 1)
+                  SliverToBoxAdapter(
+                    child: _buildWavesContent(colors, isDark, userHobbies),
+                  ),
+
                 // Clearance for the floating nav bar (64pt height + 24pt
                 // gap-from-screen-bottom + device safe-area inset).
                 SliverToBoxAdapter(
@@ -292,37 +312,243 @@ class _SearchScreenState extends ConsumerState<SearchScreen>
               top: 0,
               left: 0,
               right: 0,
-              child: SearchHeader(
-                searchController: _searchController,
-                searchFocusNode: _searchFocusNode,
-                searchQuery: _searchQuery,
-                isSearching: isSearching,
-                selectedTag: _selectedTag,
-                activeFilterCount: _activeFilterCount,
-                myHobbyNames: myHobbyNames,
-                primaryHobbyName: primaryHobbyName,
-                extraFilterHobbies: _extraFilterHobbies,
-                colors: colors,
-                isDark: isDark,
-                onSearchChanged: (v) => setState(() {
-                  _searchQuery = v;
-                  _resetPagination();
-                }),
-                onSearchCleared: () {
-                  _searchController.clear();
-                  setState(() {
-                    _searchQuery = '';
-                    _resetPagination();
-                  });
-                },
-                onTagSelected: (tag) => setState(() {
-                  _selectedTag = tag;
-                  _resetPagination();
-                }),
-                onFilterTap: () => _showFilterSheet(
-                  context,
-                  ref.read(appColorSchemeProvider),
-                  Theme.of(context).brightness == Brightness.dark,
+              child: Container(
+                decoration: BoxDecoration(
+                  color: isDark
+                      ? Colors.black.withValues(alpha: 0.75)
+                      : Colors.white.withValues(alpha: 0.92),
+                  border: Border(
+                    bottom: BorderSide(
+                        color: colors.primary.withValues(alpha: 0.1)),
+                  ),
+                ),
+                child: SafeArea(
+                  bottom: false,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      // ── People / Waves toggle (top-most) ────────
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 8, 16, 6),
+                        child: Container(
+                          height: 32,
+                          decoration: BoxDecoration(
+                            color: isDark
+                                ? Colors.white.withValues(alpha: 0.06)
+                                : Colors.black.withValues(alpha: 0.05),
+                            borderRadius: BorderRadius.circular(9),
+                          ),
+                          child: Row(
+                            children: [
+                              for (final (i, label) in [
+                                (0, 'People'),
+                                (1, 'Waves'),
+                              ])
+                                Expanded(
+                                  child: GestureDetector(
+                                    onTap: () {
+                                      HapticFeedback.selectionClick();
+                                      _searchController.clear();
+                                      setState(() {
+                                        _searchMode = i;
+                                        _searchQuery = '';
+                                        _waveQuery = '';
+                                        _resetPagination();
+                                      });
+                                    },
+                                    child: AnimatedContainer(
+                                      duration:
+                                          const Duration(milliseconds: 200),
+                                      margin: const EdgeInsets.all(2.5),
+                                      decoration: BoxDecoration(
+                                        color: _searchMode == i
+                                            ? (isDark
+                                                ? Colors.white.withValues(
+                                                    alpha: 0.12)
+                                                : Colors.white)
+                                            : Colors.transparent,
+                                        borderRadius:
+                                            BorderRadius.circular(7),
+                                        boxShadow: _searchMode == i
+                                            ? [
+                                                BoxShadow(
+                                                  color: Colors.black
+                                                      .withValues(
+                                                          alpha: 0.06),
+                                                  blurRadius: 4,
+                                                  offset:
+                                                      const Offset(0, 1),
+                                                ),
+                                              ]
+                                            : null,
+                                      ),
+                                      child: Center(
+                                        child: Text(
+                                          label,
+                                          style: TextStyle(
+                                            fontSize: 12,
+                                            fontWeight: _searchMode == i
+                                                ? FontWeight.w600
+                                                : FontWeight.w400,
+                                            color: _searchMode == i
+                                                ? (isDark
+                                                    ? Colors.white
+                                                    : Colors.black87)
+                                                : (isDark
+                                                    ? Colors.white38
+                                                    : Colors.black38),
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ),
+                      ),
+
+                      // ── Search bar row ──────────────────────────
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 0, 16, 0),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: Container(
+                                height: 44,
+                                decoration: BoxDecoration(
+                                  color: isDark
+                                      ? Colors.white.withValues(alpha: 0.08)
+                                      : Colors.black.withValues(alpha: 0.05),
+                                  borderRadius: BorderRadius.circular(14),
+                                ),
+                                child: TextField(
+                                  controller: _searchController,
+                                  focusNode: _searchFocusNode,
+                                  onChanged: (v) => setState(() {
+                                    if (_searchMode == 0) {
+                                      _searchQuery = v;
+                                      _resetPagination();
+                                    } else {
+                                      _waveQuery = v;
+                                    }
+                                  }),
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    color:
+                                        isDark ? Colors.white : Colors.black,
+                                  ),
+                                  decoration: InputDecoration(
+                                    hintText: _searchMode == 0
+                                        ? 'Search people...'
+                                        : 'Search waves...',
+                                    hintStyle: TextStyle(
+                                      color: isDark
+                                          ? Colors.white38
+                                          : Colors.black38,
+                                      fontSize: 14,
+                                    ),
+                                    prefixIcon: Icon(
+                                      Icons.search_rounded,
+                                      color: isDark
+                                          ? Colors.white38
+                                          : Colors.black38,
+                                      size: 22,
+                                    ),
+                                    suffixIcon: (_searchQuery.isNotEmpty ||
+                                            _waveQuery.isNotEmpty)
+                                        ? GestureDetector(
+                                            onTap: () {
+                                              _searchController.clear();
+                                              setState(() {
+                                                _searchQuery = '';
+                                                _waveQuery = '';
+                                                _resetPagination();
+                                              });
+                                            },
+                                            child: Icon(
+                                              Icons.close_rounded,
+                                              color: isDark
+                                                  ? Colors.white38
+                                                  : Colors.black38,
+                                              size: 20,
+                                            ),
+                                          )
+                                        : null,
+                                    border: InputBorder.none,
+                                    contentPadding:
+                                        const EdgeInsets.symmetric(
+                                            vertical: 12),
+                                  ),
+                                ),
+                              ),
+                            ),
+                            if (_searchMode == 0) ...[
+                              const SizedBox(width: 4),
+                              GestureDetector(
+                                onTap: () => _showFilterSheet(
+                                    context, colors, isDark),
+                                child: SizedBox(
+                                  width: 44,
+                                  height: 44,
+                                  child: Stack(
+                                    alignment: Alignment.center,
+                                    children: [
+                                      Icon(
+                                        Icons.tune_rounded,
+                                        color: _activeFilterCount > 0
+                                            ? colors.primary
+                                            : (isDark
+                                                ? Colors.white54
+                                                : Colors.black45),
+                                        size: 24,
+                                      ),
+                                      if (_activeFilterCount > 0)
+                                        Positioned(
+                                          top: 9,
+                                          right: 9,
+                                          child: Container(
+                                            width: 7,
+                                            height: 7,
+                                            decoration: BoxDecoration(
+                                              color: colors.primary,
+                                              shape: BoxShape.circle,
+                                            ),
+                                          ),
+                                        ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
+
+                      // ── Tags row (People mode only, not searching) ──
+                      if (_searchMode == 0 && !isSearching)
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(16, 6, 16, 8),
+                          child: SizedBox(
+                            height: 34,
+                            child: SearchTagsRow(
+                              selectedTag: _selectedTag,
+                              myHobbyNames: myHobbyNames,
+                              primaryHobbyName: primaryHobbyName,
+                              extraFilterHobbies: _extraFilterHobbies,
+                              colors: colors,
+                              isDark: isDark,
+                              onTagSelected: (tag) => setState(() {
+                                _selectedTag = tag;
+                                _resetPagination();
+                              }),
+                            ),
+                          ),
+                        )
+                      else
+                        const SizedBox(height: 8),
+                    ],
+                  ),
                 ),
               ),
             ),
@@ -464,6 +690,211 @@ class _SearchScreenState extends ConsumerState<SearchScreen>
       title: 'No matches yet',
       subtitle: 'Try adding more hobbies or broadening your filters',
     );
+  }
+
+  Widget _buildWavesContent(
+    AppColorScheme colors,
+    bool isDark,
+    List<UserHobby> userHobbies,
+  ) {
+    final wavesAsync = ref.watch(searchWavesProvider(_waveQuery));
+    final allHobbies = ref.watch(allHobbiesProvider).asData?.value ?? [];
+    final hobbyMap = {for (final h in allHobbies) h.id: h};
+
+    return wavesAsync.when(
+      loading: () => const SizedBox(
+        height: 300,
+        child: Center(
+          child: CircularProgressIndicator(strokeWidth: 2.5),
+        ),
+      ),
+      error: (e, _) => SizedBox(
+        height: 300,
+        child: Center(
+          child: Text('Failed to load waves',
+              style: TextStyle(
+                  color: isDark ? Colors.white38 : Colors.black26)),
+        ),
+      ),
+      data: (waves) {
+        if (waves.isEmpty) {
+          return SizedBox(
+            height: 300,
+            child: Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.video_library_outlined,
+                      size: 48,
+                      color: isDark ? Colors.white12 : Colors.black12),
+                  const SizedBox(height: 12),
+                  Text(
+                    _waveQuery.isNotEmpty
+                        ? 'No waves match "$_waveQuery"'
+                        : 'No waves yet',
+                    style: TextStyle(
+                      color: isDark ? Colors.white38 : Colors.black26,
+                      fontSize: 14,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        }
+
+        return Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 8),
+          child: GridView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 2,
+              childAspectRatio: 0.7,
+              crossAxisSpacing: 6,
+              mainAxisSpacing: 6,
+            ),
+            itemCount: waves.length,
+            itemBuilder: (context, i) {
+              final wave = waves[i];
+              final hobby = wave.hobbyId != null
+                  ? hobbyMap[wave.hobbyId]
+                  : null;
+
+              return GestureDetector(
+                onTap: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => UserWavesViewer(
+                        waves: waves,
+                        initialIndex: i,
+                      ),
+                    ),
+                  );
+                },
+                child: Container(
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(12),
+                    color: isDark ? Colors.white10 : Colors.grey.shade100,
+                  ),
+                  clipBehavior: Clip.antiAlias,
+                  child: Stack(
+                    fit: StackFit.expand,
+                    children: [
+                      AppCachedImage(
+                        imageUrl: wave.thumbnailUrl ?? '',
+                        fit: BoxFit.cover,
+                        errorWidget: Container(
+                          color: isDark
+                              ? Colors.grey.shade900
+                              : Colors.grey.shade200,
+                          child: Icon(Icons.play_circle_outline,
+                              size: 32,
+                              color: isDark
+                                  ? Colors.white24
+                                  : Colors.black12),
+                        ),
+                      ),
+                      // Gradient overlay
+                      Positioned.fill(
+                        child: DecoratedBox(
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              begin: Alignment.topCenter,
+                              end: Alignment.bottomCenter,
+                              colors: [
+                                Colors.transparent,
+                                Colors.black.withValues(alpha: 0.7),
+                              ],
+                              stops: const [0.5, 1.0],
+                            ),
+                          ),
+                        ),
+                      ),
+                      // Talent badge
+                      if (hobby != null)
+                        Positioned(
+                          top: 6,
+                          left: 6,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 7, vertical: 3),
+                            decoration: BoxDecoration(
+                              color: Colors.black.withValues(alpha: 0.5),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Text(
+                              '${hobby.icon} ${hobby.name}',
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 10,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                        ),
+                      // Bottom info
+                      Positioned(
+                        left: 8,
+                        right: 8,
+                        bottom: 8,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            if (wave.caption.isNotEmpty)
+                              Text(
+                                wave.caption,
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            const SizedBox(height: 4),
+                            Row(
+                              children: [
+                                Text(
+                                  '@${wave.username ?? 'user'}',
+                                  style: const TextStyle(
+                                    color: Colors.white70,
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                                const Spacer(),
+                                const Icon(Icons.play_arrow_rounded,
+                                    color: Colors.white70, size: 14),
+                                const SizedBox(width: 2),
+                                Text(
+                                  _formatCount(wave.viewCount),
+                                  style: const TextStyle(
+                                    color: Colors.white70,
+                                    fontSize: 10,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            },
+          ),
+        );
+      },
+    );
+  }
+
+  String _formatCount(int n) {
+    if (n < 1000) return n.toString();
+    if (n < 10000) return '${(n / 1000).toStringAsFixed(1)}k';
+    if (n < 1000000) return '${(n / 1000).toStringAsFixed(0)}k';
+    return '${(n / 1000000).toStringAsFixed(1)}M';
   }
 
   Widget _buildEmptyState({

@@ -383,3 +383,134 @@ class SearchHeader extends StatelessWidget {
     );
   }
 }
+
+class SearchTagsRow extends StatelessWidget {
+  final String selectedTag;
+  final List<String> myHobbyNames;
+  final String? primaryHobbyName;
+  final List<String> extraFilterHobbies;
+  final AppColorScheme colors;
+  final bool isDark;
+  final ValueChanged<String> onTagSelected;
+
+  static const List<String> _quickTags = ['All', 'Trending'];
+
+  const SearchTagsRow({
+    super.key,
+    required this.selectedTag,
+    required this.myHobbyNames,
+    required this.primaryHobbyName,
+    required this.extraFilterHobbies,
+    required this.colors,
+    required this.isDark,
+    required this.onTagSelected,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return ListView(
+      scrollDirection: Axis.horizontal,
+      physics: const BouncingScrollPhysics(),
+      children: [
+        ..._quickTags.map((tag) => _buildPill(
+              tag: tag,
+              isSelected: tag == selectedTag,
+              isPrimary: false,
+              isAccent: false,
+            )),
+        ...[
+          if (primaryHobbyName != null) primaryHobbyName!,
+          ...myHobbyNames.where((h) => h != primaryHobbyName),
+        ].map((hobby) => _buildPill(
+              tag: hobby,
+              isSelected: selectedTag == hobby,
+              isPrimary: hobby == primaryHobbyName,
+              isAccent: true,
+            )),
+        ...extraFilterHobbies
+            .where((h) => !myHobbyNames.contains(h))
+            .map((hobby) => _buildPill(
+                  tag: hobby,
+                  isSelected: selectedTag == hobby,
+                  isPrimary: false,
+                  isAccent: true,
+                )),
+      ],
+    );
+  }
+
+  Widget _buildPill({
+    required String tag,
+    required bool isSelected,
+    required bool isPrimary,
+    required bool isAccent,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.only(right: 8),
+      child: GestureDetector(
+        onTap: () {
+          HapticFeedback.lightImpact();
+          onTagSelected(tag);
+        },
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+          decoration: BoxDecoration(
+            color: isSelected
+                ? colors.primary
+                : isAccent
+                    ? colors.primary.withValues(alpha: isDark ? 0.15 : 0.1)
+                    : (isDark
+                        ? Colors.white.withValues(alpha: 0.08)
+                        : Colors.white),
+            borderRadius: BorderRadius.circular(99),
+            border: isSelected
+                ? null
+                : Border.all(
+                    color: isAccent
+                        ? colors.primary.withValues(alpha: 0.35)
+                        : (isDark
+                            ? Colors.white.withValues(alpha: 0.1)
+                            : Colors.black.withValues(alpha: 0.08)),
+                  ),
+            boxShadow: isSelected
+                ? [
+                    BoxShadow(
+                      color: colors.primary.withValues(alpha: 0.25),
+                      blurRadius: 8,
+                      offset: const Offset(0, 2),
+                    ),
+                  ]
+                : null,
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (isPrimary) ...[
+                Icon(Icons.star_rounded,
+                    size: 13,
+                    color: isSelected ? Colors.white : colors.primary),
+                const SizedBox(width: 5),
+              ],
+              Text(
+                tag,
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight:
+                      isSelected || isAccent ? FontWeight.w700 : FontWeight.w500,
+                  color: isSelected
+                      ? Colors.white.withValues(alpha: 0.85)
+                      : isAccent
+                          ? (isDark
+                              ? Colors.white.withValues(alpha: 0.9)
+                              : colors.primary)
+                          : (isDark ? Colors.white70 : Colors.black54),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}

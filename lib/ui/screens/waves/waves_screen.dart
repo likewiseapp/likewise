@@ -4,7 +4,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:video_player/video_player.dart';
 
 import '../../../core/models/wave.dart';
+import '../../../core/providers/auth_providers.dart';
+import '../../../core/providers/hobby_providers.dart';
 import '../../../core/providers/navigation_providers.dart';
+import '../../../core/providers/profile_providers.dart';
 import '../../../core/providers/wave_providers.dart';
 import '../../../core/theme_provider.dart';
 import '../../widgets/app_cached_image.dart';
@@ -59,9 +62,13 @@ class _WavesScreenState extends ConsumerState<WavesScreen> {
 
     final colors = ref.watch(appColorSchemeProvider);
 
+    final activeHobbyId = ref.watch(waveHobbyFilterProvider);
+
     return Scaffold(
       backgroundColor: Colors.black,
-      body: wavesAsync.when(
+      body: Stack(
+        children: [
+          wavesAsync.when(
         loading: () => _WavesLoadingScreen(colors: colors),
         error: (e, _) => Center(
           child: Text(
@@ -122,6 +129,278 @@ class _WavesScreenState extends ConsumerState<WavesScreen> {
                 ),
           );
         },
+      ),
+
+          // ── Filter button (top-left) ──────────────────────────────────
+          Positioned(
+            top: 14 + MediaQuery.of(context).padding.top,
+            left: 14,
+            child: GestureDetector(
+              onTap: () => _showHobbyFilter(context, ref, colors),
+              child: Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                decoration: BoxDecoration(
+                  color: activeHobbyId != null
+                      ? colors.primary.withValues(alpha: 0.3)
+                      : Colors.black.withValues(alpha: 0.35),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(
+                    color: activeHobbyId != null
+                        ? colors.primary.withValues(alpha: 0.6)
+                        : Colors.white.withValues(alpha: 0.15),
+                  ),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      Icons.tune_rounded,
+                      size: 16,
+                      color: activeHobbyId != null
+                          ? colors.primary
+                          : Colors.white,
+                    ),
+                    if (activeHobbyId != null) ...[
+                      const SizedBox(width: 6),
+                      Consumer(builder: (_, ref, __) {
+                        final hobbies = ref.watch(allHobbiesProvider);
+                        final name = hobbies.whenOrNull(
+                          data: (list) => list
+                              .where((h) => h.id == activeHobbyId)
+                              .map((h) => '${h.icon} ${h.name}')
+                              .firstOrNull,
+                        );
+                        return Text(
+                          name ?? '...',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        );
+                      }),
+                      const SizedBox(width: 4),
+                      GestureDetector(
+                        onTap: () {
+                          ref.read(waveHobbyFilterProvider.notifier).clear();
+                        },
+                        child: const Icon(Icons.close_rounded,
+                            size: 14, color: Colors.white70),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showHobbyFilter(
+      BuildContext context, WidgetRef ref, AppColorScheme colors) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (_) => _HobbyFilterSheet(ref: ref, colors: colors),
+    );
+  }
+}
+
+// ── Hobby filter bottom sheet ────────────────────────────────────────────────
+
+class _HobbyFilterSheet extends ConsumerStatefulWidget {
+  final WidgetRef ref;
+  final AppColorScheme colors;
+
+  const _HobbyFilterSheet({required this.ref, required this.colors});
+
+  @override
+  ConsumerState<_HobbyFilterSheet> createState() => _HobbyFilterSheetState();
+}
+
+class _HobbyFilterSheetState extends ConsumerState<_HobbyFilterSheet> {
+  String _query = '';
+
+  @override
+  Widget build(BuildContext context) {
+    final allHobbies = ref.watch(allHobbiesProvider);
+    final userId = ref.watch(currentUserIdProvider);
+    final userHobbiesAsync =
+        userId != null ? ref.watch(userHobbiesProvider(userId)) : null;
+    final activeId = ref.watch(waveHobbyFilterProvider);
+
+    return Container(
+      constraints: BoxConstraints(
+        maxHeight: MediaQuery.of(context).size.height * 0.55,
+      ),
+      decoration: const BoxDecoration(
+        color: Color(0xFF1A1A1A),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const SizedBox(height: 10),
+          Container(
+            width: 36,
+            height: 4,
+            decoration: BoxDecoration(
+              color: Colors.white24,
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 14, 16, 0),
+            child: Row(
+              children: [
+                const Text(
+                  'Filter by talent',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const Spacer(),
+                if (activeId != null)
+                  GestureDetector(
+                    onTap: () {
+                      ref.read(waveHobbyFilterProvider.notifier).clear();
+                      Navigator.pop(context);
+                    },
+                    child: Text(
+                      'Clear',
+                      style: TextStyle(
+                        color: widget.colors.primary,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+            child: TextField(
+              onChanged: (v) => setState(() => _query = v.toLowerCase()),
+              style: const TextStyle(color: Colors.white, fontSize: 14),
+              decoration: InputDecoration(
+                hintText: 'Search talents...',
+                hintStyle: const TextStyle(color: Colors.white38, fontSize: 14),
+                prefixIcon: const Icon(Icons.search_rounded,
+                    color: Colors.white38, size: 20),
+                filled: true,
+                fillColor: Colors.white10,
+                isDense: true,
+                contentPadding: const EdgeInsets.symmetric(vertical: 10),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide.none,
+                ),
+              ),
+            ),
+          ),
+          Flexible(
+            child: allHobbies.when(
+              loading: () => const Center(
+                child: Padding(
+                  padding: EdgeInsets.all(24),
+                  child: CircularProgressIndicator(color: Colors.white38),
+                ),
+              ),
+              error: (_, __) => const SizedBox.shrink(),
+              data: (hobbies) {
+                final userHobbyIds = userHobbiesAsync?.whenOrNull(
+                      data: (list) =>
+                          list.map((uh) => uh.hobbyId).toSet(),
+                    ) ??
+                    <int>{};
+
+                var filtered = hobbies.where(
+                  (h) => h.name.toLowerCase().contains(_query),
+                ).toList();
+
+                // User's hobbies first
+                filtered.sort((a, b) {
+                  final aUser = userHobbyIds.contains(a.id) ? 0 : 1;
+                  final bUser = userHobbyIds.contains(b.id) ? 0 : 1;
+                  if (aUser != bUser) return aUser.compareTo(bUser);
+                  return a.name.compareTo(b.name);
+                });
+
+                return ListView.builder(
+                  padding: const EdgeInsets.only(bottom: 16),
+                  itemCount: filtered.length,
+                  itemBuilder: (_, i) {
+                    final hobby = filtered[i];
+                    final isUserHobby = userHobbyIds.contains(hobby.id);
+                    final isActive = hobby.id == activeId;
+
+                    return ListTile(
+                      dense: true,
+                      visualDensity: VisualDensity.compact,
+                      contentPadding:
+                          const EdgeInsets.symmetric(horizontal: 16),
+                      leading: Text(hobby.icon,
+                          style: const TextStyle(fontSize: 20)),
+                      title: Row(
+                        children: [
+                          Text(
+                            hobby.name,
+                            style: TextStyle(
+                              color: isActive
+                                  ? widget.colors.primary
+                                  : Colors.white,
+                              fontSize: 14,
+                              fontWeight: isActive
+                                  ? FontWeight.w700
+                                  : FontWeight.w400,
+                            ),
+                          ),
+                          if (isUserHobby) ...[
+                            const SizedBox(width: 6),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 6, vertical: 1),
+                              decoration: BoxDecoration(
+                                color: widget.colors.primary
+                                    .withValues(alpha: 0.15),
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: Text(
+                                'yours',
+                                style: TextStyle(
+                                  color: widget.colors.primary,
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                      trailing: isActive
+                          ? Icon(Icons.check_circle_rounded,
+                              color: widget.colors.primary, size: 20)
+                          : null,
+                      onTap: () {
+                        ref
+                            .read(waveHobbyFilterProvider.notifier)
+                            .set(hobby.id);
+                        Navigator.pop(context);
+                      },
+                    );
+                  },
+                );
+              },
+            ),
+          ),
+        ],
       ),
     );
   }

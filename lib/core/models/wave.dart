@@ -7,6 +7,7 @@ class Wave {
   final String? thumbnailUrl;
   final String caption;
   final DateTime createdAt;
+  final int? hobbyId;
 
   // Engagement (cached aggregates + per-viewer state)
   final int viewCount;
@@ -28,6 +29,7 @@ class Wave {
     this.thumbnailUrl,
     required this.caption,
     required this.createdAt,
+    this.hobbyId,
     this.viewCount = 0,
     this.likeCount = 0,
     this.commentCount = 0,
@@ -58,6 +60,7 @@ class Wave {
       thumbnailUrl: json['thumbnail_url'] as String?,
       caption: json['caption'] as String? ?? '',
       createdAt: DateTime.parse(json['created_at'] as String),
+      hobbyId: (json['hobby_id'] as num?)?.toInt(),
       viewCount: (json['view_count'] as num?)?.toInt() ?? 0,
       likeCount: (json['like_count'] as num?)?.toInt() ?? 0,
       commentCount: (json['comment_count'] as num?)?.toInt() ?? 0,
@@ -83,6 +86,7 @@ class Wave {
       thumbnailUrl: thumbnailUrl,
       caption: caption,
       createdAt: createdAt,
+      hobbyId: hobbyId,
       viewCount: viewCount ?? this.viewCount,
       likeCount: likeCount ?? this.likeCount,
       commentCount: commentCount ?? this.commentCount,

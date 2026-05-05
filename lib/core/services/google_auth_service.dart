@@ -7,7 +7,7 @@ class GoogleAuthService {
   final SupabaseClient _client;
 
   static const _webClientId =
-      '37982742852-kc171e10f7d0ndgjv50ajdjmacp98q0b.apps.googleusercontent.com';
+      '501605932947-op8d0lgl152tc1ns17hii8m5r1vlakna.apps.googleusercontent.com';
 
   final _googleSignIn = GoogleSignIn(serverClientId: _webClientId);
 

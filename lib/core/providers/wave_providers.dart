@@ -35,37 +35,25 @@ class _UploadProgressNotifier extends Notifier<double> {
   void set(double value) => state = value;
 }
 
-/// When true, the wave feed only shows waves from posters who share
-/// at least one hobby with the current user.
-class _WaveHobbyFilterNotifier extends Notifier<bool> {
+class WaveHobbyFilterNotifier extends Notifier<int?> {
   @override
-  bool build() => false;
+  int? build() => null;
 
-  void toggle() => state = !state;
+  void set(int? hobbyId) => state = hobbyId;
+  void clear() => state = null;
 }
 
 final waveHobbyFilterProvider =
-    NotifierProvider<_WaveHobbyFilterNotifier, bool>(
-  _WaveHobbyFilterNotifier.new,
+    NotifierProvider<WaveHobbyFilterNotifier, int?>(
+  WaveHobbyFilterNotifier.new,
 );
 
 final wavesProvider = FutureProvider<List<Wave>>((ref) async {
   final client = ref.watch(supabaseProvider);
-  final filterByHobby = ref.watch(waveHobbyFilterProvider);
+  final hobbyId = ref.watch(waveHobbyFilterProvider);
 
-  if (filterByHobby) {
-    final userId = ref.read(currentUserIdProvider);
-    if (userId != null) {
-      final hobbies = await client
-          .from('user_hobbies')
-          .select('hobby_id')
-          .eq('user_id', userId);
-      final hobbyIds =
-          (hobbies as List).map((e) => e['hobby_id'] as int).toList();
-      if (hobbyIds.isNotEmpty) {
-        return WaveService(client).fetchWavesByHobbies(hobbyIds);
-      }
-    }
+  if (hobbyId != null) {
+    return WaveService(client).fetchWavesByHobbyId(hobbyId);
   }
 
   return WaveService(client).fetchWaves();
@@ -78,6 +66,12 @@ final userWavesProvider =
     FutureProvider.family<List<Wave>, String>((ref, userId) async {
   final client = ref.watch(supabaseProvider);
   return WaveService(client).fetchWavesByUser(userId);
+});
+
+final searchWavesProvider =
+    FutureProvider.family<List<Wave>, String>((ref, query) async {
+  final client = ref.watch(supabaseProvider);
+  return WaveService(client).searchWaves(query);
 });
 
 final waveEngagementServiceProvider = Provider<WaveEngagementService>((ref) {
@@ -173,7 +167,7 @@ class WaveUploadNotifier extends Notifier<AsyncValue<void>> {
     return const AsyncData(null);
   }
 
-  Future<bool> upload(File video, String caption) async {
+  Future<bool> upload(File video, String caption, {required int hobbyId}) async {
     ref.read(uploadStageProvider.notifier).set(UploadStage.compressing);
     ref.read(uploadProgressProvider.notifier).set(0.0);
     state = const AsyncLoading();
@@ -183,6 +177,7 @@ class WaveUploadNotifier extends Notifier<AsyncValue<void>> {
         video,
         caption,
         _userId,
+        hobbyId: hobbyId,
         onCompressProgress: (p) {
           ref.read(uploadStageProvider.notifier).set(UploadStage.compressing);
           ref.read(uploadProgressProvider.notifier).set(p);
