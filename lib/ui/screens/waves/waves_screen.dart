@@ -78,6 +78,8 @@ class _WavesScreenState extends ConsumerState<WavesScreen> {
           ),
         ),
         data: (waves) {
+          final wavesChanged = _player.setWaves(waves);
+
           if (waves.isEmpty) {
             return const Center(
               child: Column(
@@ -96,7 +98,7 @@ class _WavesScreenState extends ConsumerState<WavesScreen> {
             );
           }
 
-          if (_player.setWaves(waves) && isTabActive) {
+          if (wavesChanged && isTabActive) {
             _player.firstVideoReady = false;
             _player.loadAndPlay(0);
           }

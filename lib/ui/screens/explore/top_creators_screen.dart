@@ -20,7 +20,12 @@ class TopCreatorsScreen extends ConsumerWidget {
 
     return Scaffold(
       body: SafeArea(
-        child: CustomScrollView(
+        child: RefreshIndicator(
+          onRefresh: () async {
+            ref.invalidate(allTopCreatorsProvider);
+          },
+          child: CustomScrollView(
+          physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
           slivers: [
             // ── Header ───────────────────────────────────────────
             SliverToBoxAdapter(
@@ -204,6 +209,7 @@ class TopCreatorsScreen extends ConsumerWidget {
 
             const SliverToBoxAdapter(child: SizedBox(height: 100)),
           ],
+        ),
         ),
       ),
     );

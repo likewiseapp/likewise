@@ -136,10 +136,47 @@ class _MessagesScreenState extends ConsumerState<MessagesScreen> {
         <String>{};
 
     return Scaffold(
+      floatingActionButton: Padding(
+        padding: const EdgeInsets.only(bottom: 16),
+        child: GestureDetector(
+          onTap: () {
+            HapticFeedback.lightImpact();
+            context.push('/new-chat');
+          },
+          child: Container(
+            width: 56,
+            height: 56,
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [colors.primary, colors.accent],
+              ),
+              shape: BoxShape.circle,
+              boxShadow: [
+                BoxShadow(
+                  color: colors.primary.withValues(alpha: 0.35),
+                  blurRadius: 12,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            child: const Icon(
+              Icons.add_rounded,
+              size: 28,
+              color: Colors.white,
+            ),
+          ),
+        ),
+      ),
       body: Stack(
         children: [
-          CustomScrollView(
-            physics: const BouncingScrollPhysics(),
+          RefreshIndicator(
+            onRefresh: () async {
+              ref.invalidate(conversationsProvider);
+              ref.invalidate(requestConversationsProvider);
+              ref.invalidate(onlineUsersProvider);
+            },
+            child: CustomScrollView(
+            physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
             slivers: [
               SliverToBoxAdapter(
                 child: SizedBox(
@@ -370,6 +407,7 @@ class _MessagesScreenState extends ConsumerState<MessagesScreen> {
               const SliverToBoxAdapter(child: SizedBox(height: 100)),
             ],
           ),
+          ),
 
           // Glass header
           Positioned(
@@ -527,17 +565,6 @@ class _MessagesScreenState extends ConsumerState<MessagesScreen> {
                                   ),
                                 ),
                                 const Spacer(),
-                                GestureDetector(
-                                  onTap: () {
-                                    HapticFeedback.lightImpact();
-                                    context.push('/new-chat');
-                                  },
-                                  child: Icon(
-                                    Icons.edit_outlined,
-                                    size: 22,
-                                    color: isDark ? Colors.white70 : Colors.black54,
-                                  ),
-                                ),
                               ],
                             ),
                           const SizedBox(height: 12),
@@ -704,67 +731,39 @@ class _ConversationTile extends StatelessWidget {
     if (date == null) return '';
     final now = DateTime.now();
     final diff = now.difference(date);
-
-    // Just now (under 1 minute)
-    if (diff.inSeconds < 60) return 'Just now';
-
-    // Minutes (1m – 59m)
-    if (diff.inMinutes < 60) {
-      final m = diff.inMinutes;
-      return '$m min${m == 1 ? '' : 's'} ago';
-    }
-
-    // Hours (1h – 23h)
-    if (diff.inHours < 24) {
-      final h = diff.inHours;
-      return '$h hr${h == 1 ? '' : 's'} ago';
-    }
-
-    // Yesterday
+    if (diff.inSeconds < 60) return 'now';
+    if (diff.inMinutes < 60) return '${diff.inMinutes}m';
+    if (diff.inHours < 24) return '${diff.inHours}h';
     final yesterday = DateTime(now.year, now.month, now.day - 1);
     if (date.year == yesterday.year &&
         date.month == yesterday.month &&
         date.day == yesterday.day) {
       return 'Yesterday';
     }
-
-    // Days (2d – 6d)
-    if (diff.inDays < 7) {
-      return '${diff.inDays}d ago';
-    }
-
-    // Weeks (1w – 4w)
-    if (diff.inDays < 30) {
-      final w = diff.inDays ~/ 7;
-      return '$w wk${w == 1 ? '' : 's'} ago';
-    }
-
-    // Months (1mo – 11mo)
-    if (diff.inDays < 365) {
-      final mo = diff.inDays ~/ 30;
-      return '$mo mo${mo == 1 ? '' : 's'} ago';
-    }
-
-    // Years
-    final y = diff.inDays ~/ 365;
-    return '$y yr${y == 1 ? '' : 's'} ago';
+    if (diff.inDays < 7) return '${diff.inDays}d';
+    if (diff.inDays < 30) return '${diff.inDays ~/ 7}w';
+    if (diff.inDays < 365) return '${diff.inDays ~/ 30}mo';
+    return '${diff.inDays ~/ 365}y';
   }
 
   @override
   Widget build(BuildContext context) {
     final hasUnread = conversation.unreadCount > 0;
+    final scaffoldBg = Theme.of(context).scaffoldBackgroundColor;
 
     return GestureDetector(
       onTap: selectMode ? onSelect : onTap,
       onLongPress: onLongPress,
+      behavior: HitTestBehavior.opaque,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 150),
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
         color: isSelected
-            ? colors.primary.withValues(alpha: isDark ? 0.15 : 0.08)
+            ? colors.primary.withValues(alpha: isDark ? 0.12 : 0.06)
             : Colors.transparent,
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
         child: Row(
           children: [
+            // Selection checkbox
             AnimatedSize(
               duration: const Duration(milliseconds: 150),
               curve: Curves.easeInOut,
@@ -792,103 +791,125 @@ class _ConversationTile extends StatelessWidget {
                     )
                   : const SizedBox.shrink(),
             ),
-            Stack(
-              children: [
-                if (isBlockedByOther)
-                  Container(
-                    width: 52,
-                    height: 52,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: isDark
-                          ? Colors.white.withValues(alpha: 0.07)
-                          : Colors.black.withValues(alpha: 0.05),
-                    ),
-                    child: Icon(Icons.person_rounded,
-                        size: 26,
-                        color: isDark ? Colors.white24 : Colors.black26),
-                  )
-                else
-                  AppCachedImage(
-                    imageUrl: conversation.otherAvatarUrl ?? '',
-                    width: 52,
-                    height: 52,
-                    borderRadius: BorderRadius.circular(50),
-                    errorWidget: Container(
-                      width: 52,
-                      height: 52,
-                      color: Colors.grey.shade300,
-                      child: const Icon(Icons.person, color: Colors.grey),
-                    ),
-                  ),
-                // Online dot — already suppressed via isOtherOnline=false when blocked
-                if (isOtherOnline)
-                  Positioned(
-                    bottom: 1,
-                    right: 1,
-                    child: Container(
-                      width: 14,
-                      height: 14,
+
+            // Avatar
+            SizedBox(
+              width: 56,
+              height: 56,
+              child: Stack(
+                children: [
+                  if (isBlockedByOther)
+                    Container(
+                      width: 56,
+                      height: 56,
                       decoration: BoxDecoration(
-                        color: colors.primary,
                         shape: BoxShape.circle,
-                        border: Border.all(
-                          color: Theme.of(context).scaffoldBackgroundColor,
-                          width: 2.5,
+                        color: isDark
+                            ? Colors.white.withValues(alpha: 0.07)
+                            : Colors.black.withValues(alpha: 0.05),
+                      ),
+                      child: Icon(Icons.person_rounded,
+                          size: 28,
+                          color: isDark ? Colors.white24 : Colors.black26),
+                    )
+                  else
+                    AppCachedImage(
+                      imageUrl: conversation.otherAvatarUrl ?? '',
+                      width: 56,
+                      height: 56,
+                      borderRadius: BorderRadius.circular(56),
+                      errorWidget: Container(
+                        width: 56,
+                        height: 56,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: isDark
+                              ? Colors.white.withValues(alpha: 0.08)
+                              : Colors.grey.shade200,
+                        ),
+                        child: Icon(Icons.person_rounded,
+                            size: 28,
+                            color: isDark ? Colors.white38 : Colors.grey),
+                      ),
+                    ),
+                  if (isOtherOnline)
+                    Positioned(
+                      bottom: 0,
+                      right: 0,
+                      child: Container(
+                        width: 16,
+                        height: 16,
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF4CAF50),
+                          shape: BoxShape.circle,
+                          border: Border.all(color: scaffoldBg, width: 2.5),
                         ),
                       ),
                     ),
-                  ),
-              ],
+                ],
+              ),
             ),
+
             const SizedBox(width: 14),
+
+            // Text content
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    conversation.otherFullName ?? conversation.otherUsername ?? 'Unknown',
-                    style: TextStyle(
-                      fontSize: 15,
-                      fontWeight: hasUnread ? FontWeight.w700 : FontWeight.w600,
-                      color: isDark ? Colors.white : Colors.black87,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
+                  // Name + time row
                   Row(
                     children: [
-                      // Tick mark for my last message
+                      Expanded(
+                        child: Text(
+                          conversation.otherFullName ?? conversation.otherUsername ?? 'Unknown',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: hasUnread ? FontWeight.w700 : FontWeight.w500,
+                            color: isDark ? Colors.white : Colors.black87,
+                            letterSpacing: -0.2,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        _timeAgo(conversation.lastMessageAt ?? conversation.createdAt),
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w400,
+                          color: hasUnread
+                              ? colors.primary
+                              : (isDark ? Colors.white30 : Colors.black26),
+                        ),
+                      ),
+                    ],
+                  ),
+
+                  const SizedBox(height: 4),
+
+                  // Message preview + badge row
+                  Row(
+                    children: [
+                      // Read receipts
                       if (conversation.lastMessageSenderId == currentUserId &&
                           conversation.lastMessage != null) ...[
                         if (conversation.lastMessageIsRead)
-                          SizedBox(
-                            width: 16,
-                            height: 13,
-                            child: Stack(
-                              alignment: Alignment.center,
-                              children: [
-                                Icon(
-                                  Icons.done_all_rounded,
-                                  size: 14,
-                                  color: Colors.black.withValues(alpha: 0.15),
-                                ),
-                                Icon(
-                                  Icons.done_all_rounded,
-                                  size: 13,
-                                  color: colors.primary,
-                                ),
-                              ],
-                            ),
+                          Padding(
+                            padding: const EdgeInsets.only(right: 4),
+                            child: Icon(Icons.done_all_rounded,
+                                size: 16, color: colors.primary),
                           )
                         else
-                          Icon(
-                            Icons.done_rounded,
-                            size: 13,
-                            color: isDark
-                                ? Colors.white.withValues(alpha: 0.35)
-                                : Colors.black.withValues(alpha: 0.25),
+                          Padding(
+                            padding: const EdgeInsets.only(right: 4),
+                            child: Icon(Icons.done_rounded,
+                                size: 16,
+                                color: isDark
+                                    ? Colors.white.withValues(alpha: 0.3)
+                                    : Colors.black.withValues(alpha: 0.2)),
                           ),
-                        const SizedBox(width: 4),
                       ],
                       Expanded(
                         child: Text(
@@ -896,56 +917,41 @@ class _ConversationTile extends StatelessWidget {
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: TextStyle(
-                            fontSize: 13,
+                            fontSize: 14,
                             fontWeight: hasUnread ? FontWeight.w500 : FontWeight.w400,
                             color: hasUnread
                                 ? (isDark ? Colors.white70 : Colors.black54)
-                                : (isDark ? Colors.white38 : Colors.black38),
+                                : (isDark ? Colors.white30 : Colors.black38),
                           ),
                         ),
                       ),
+                      if (hasUnread) ...[
+                        const SizedBox(width: 10),
+                        Container(
+                          width: 22,
+                          height: 22,
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              colors: [colors.primary, colors.accent],
+                            ),
+                            shape: BoxShape.circle,
+                          ),
+                          child: Center(
+                            child: Text(
+                              '${conversation.unreadCount}',
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 11,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
                     ],
                   ),
                 ],
               ),
-            ),
-            const SizedBox(width: 10),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                Text(
-                  _timeAgo(conversation.lastMessageAt ?? conversation.createdAt),
-                  style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w500,
-                    color: hasUnread
-                        ? colors.primary
-                        : (isDark ? Colors.white30 : Colors.black26),
-                  ),
-                ),
-                const SizedBox(height: 6),
-                if (hasUnread)
-                  Container(
-                    width: 22,
-                    height: 22,
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: [colors.primary, colors.accent],
-                      ),
-                      shape: BoxShape.circle,
-                    ),
-                    child: Center(
-                      child: Text(
-                        '${conversation.unreadCount}',
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 10,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                    ),
-                  ),
-              ],
             ),
           ],
         ),

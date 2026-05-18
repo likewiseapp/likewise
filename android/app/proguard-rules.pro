@@ -17,3 +17,6 @@
 
 # Prevent stripping of enum classes
 -keepclassmembers enum * { *; }
+
+# Google Play Core (deferred components)
+-dontwarn com.google.android.play.core.**

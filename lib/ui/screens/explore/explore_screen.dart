@@ -92,7 +92,17 @@ class _ExploreScreenState extends ConsumerState<ExploreScreen> {
 
     return Scaffold(
       body: SafeArea(
-        child: CustomScrollView(
+        child: RefreshIndicator(
+          onRefresh: () async {
+            ref.invalidate(twinMatchProvider);
+            ref.invalidate(nearbyUsersProvider);
+            ref.invalidate(topCreatorsProvider);
+            ref.invalidate(currentProfileProvider);
+            ref.invalidate(unreadMessagesCountProvider);
+            ref.invalidate(notificationsProvider);
+          },
+          child: CustomScrollView(
+          physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
           slivers: [
             // ── Sticky top bar (menu | logo | chat | bell) ─────────
             SliverAppBar(
@@ -385,9 +395,9 @@ class _ExploreScreenState extends ConsumerState<ExploreScreen> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           _buildSectionHeader(context, colors, 'Your Twin'),
-                          const SizedBox(height: 14),
-                          AspectRatio(
-                            aspectRatio: 1.5,
+                          const SizedBox(height: 10),
+                          SizedBox(
+                            height: 160,
                             child: UserProfileCard(
                               data: cardData,
                               onTap: () {
@@ -655,6 +665,7 @@ class _ExploreScreenState extends ConsumerState<ExploreScreen> {
               ),
             ),
           ],
+        ),
         ),
       ),
     );
@@ -1036,4 +1047,5 @@ class _ExploreScreenState extends ConsumerState<ExploreScreen> {
       ],
     );
   }
+
 }

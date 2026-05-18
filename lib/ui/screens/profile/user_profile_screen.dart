@@ -21,6 +21,7 @@ import '../../../core/app_theme.dart';
 import '../../../core/theme_provider.dart';
 import '../../widgets/app_cached_image.dart';
 import '../../widgets/avatar_popup.dart';
+import '../waves/user_waves_viewer.dart';
 
 class UserProfileScreen extends ConsumerStatefulWidget {
   final String userId;
@@ -300,8 +301,14 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
               ((visibility == 'private') ||
                (visibility == 'followers_only' && !isFollowing));
 
-          return CustomScrollView(
-            physics: const BouncingScrollPhysics(),
+          return RefreshIndicator(
+            onRefresh: () async {
+              ref.invalidate(profileStatsProvider(widget.userId));
+              ref.invalidate(userHobbiesProvider(widget.userId));
+              ref.invalidate(isFollowingProvider(widget.userId));
+            },
+            child: CustomScrollView(
+            physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
             slivers: [
               // ── App Bar ─────────────────────────────────────────────────
               SliverAppBar(
@@ -750,6 +757,7 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
 
               const SliverToBoxAdapter(child: SizedBox(height: 40)),
             ],
+          ),
           );
         },
       ),
@@ -1039,54 +1047,67 @@ class _UserWavesSection extends ConsumerWidget {
             delegate: SliverChildBuilderDelegate(
               (context, index) {
                 final wave = waves[index];
-                return ClipRRect(
-                  borderRadius: BorderRadius.circular(10),
-                  child: Stack(
-                    fit: StackFit.expand,
-                    children: [
-                      AppCachedImage(
-                        imageUrl: wave.thumbnailUrl,
-                        fit: BoxFit.cover,
-                        errorWidget: Container(
-                          color: Colors.grey.shade900,
-                          child: const Icon(Icons.videocam_outlined,
-                              color: Colors.white24),
+                return GestureDetector(
+                  onTap: () {
+                    HapticFeedback.lightImpact();
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => UserWavesViewer(
+                          waves: waves,
+                          initialIndex: index,
                         ),
                       ),
-                      const DecoratedBox(
-                        decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            begin: Alignment.topCenter,
-                            end: Alignment.bottomCenter,
-                            colors: [Colors.transparent, Colors.black54],
-                            stops: [0.55, 1.0],
+                    );
+                  },
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(10),
+                    child: Stack(
+                      fit: StackFit.expand,
+                      children: [
+                        AppCachedImage(
+                          imageUrl: wave.thumbnailUrl,
+                          fit: BoxFit.cover,
+                          errorWidget: Container(
+                            color: Colors.grey.shade900,
+                            child: const Icon(Icons.videocam_outlined,
+                                color: Colors.white24),
                           ),
                         ),
-                      ),
-                      Positioned(
-                        left: 6,
-                        bottom: 5,
-                        child: Row(
-                          children: [
-                            const Icon(Icons.play_arrow_rounded,
-                                size: 14, color: Colors.white),
-                            const SizedBox(width: 2),
-                            Text(
-                              _compactCount(wave.viewCount),
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 11,
-                                fontWeight: FontWeight.w700,
-                                shadows: [
-                                  Shadow(
-                                      color: Colors.black54, blurRadius: 3)
-                                ],
-                              ),
+                        const DecoratedBox(
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              begin: Alignment.topCenter,
+                              end: Alignment.bottomCenter,
+                              colors: [Colors.transparent, Colors.black54],
+                              stops: [0.55, 1.0],
                             ),
-                          ],
+                          ),
                         ),
-                      ),
-                    ],
+                        Positioned(
+                          left: 6,
+                          bottom: 5,
+                          child: Row(
+                            children: [
+                              const Icon(Icons.play_arrow_rounded,
+                                  size: 14, color: Colors.white),
+                              const SizedBox(width: 2),
+                              Text(
+                                _compactCount(wave.viewCount),
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w700,
+                                  shadows: [
+                                    Shadow(
+                                        color: Colors.black54, blurRadius: 3)
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 );
               },

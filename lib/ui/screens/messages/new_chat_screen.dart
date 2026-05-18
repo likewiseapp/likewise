@@ -165,18 +165,21 @@ class _NewChatScreenState extends ConsumerState<NewChatScreen> {
                     );
                   }
 
-                  return SliverList(
-                    delegate: SliverChildBuilderDelegate(
-                      (context, index) {
-                        final user = filtered[index];
-                        return _UserTile(
-                          user: user,
-                          colors: colors,
-                          isDark: isDark,
-                          onTap: () => _startChat(user),
-                        );
-                      },
-                      childCount: filtered.length,
+                  return SliverPadding(
+                    padding: const EdgeInsets.symmetric(horizontal: 14),
+                    sliver: SliverList(
+                      delegate: SliverChildBuilderDelegate(
+                        (context, index) {
+                          final user = filtered[index];
+                          return _UserTile(
+                            user: user,
+                            colors: colors,
+                            isDark: isDark,
+                            onTap: () => _startChat(user),
+                          );
+                        },
+                        childCount: filtered.length,
+                      ),
                     ),
                   );
                 },
@@ -331,21 +334,35 @@ class _UserTile extends StatelessWidget {
   Widget build(BuildContext context) {
     return GestureDetector(
       onTap: onTap,
+      behavior: HitTestBehavior.opaque,
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-        color: Colors.transparent,
+        margin: const EdgeInsets.only(bottom: 4),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        decoration: BoxDecoration(
+          color: isDark
+              ? Colors.white.withValues(alpha: 0.03)
+              : Colors.black.withValues(alpha: 0.02),
+          borderRadius: BorderRadius.circular(16),
+        ),
         child: Row(
           children: [
             AppCachedImage(
               imageUrl: user.avatarUrl,
-              width: 52,
-              height: 52,
+              width: 50,
+              height: 50,
               borderRadius: BorderRadius.circular(50),
               errorWidget: Container(
-                width: 52,
-                height: 52,
-                color: Colors.grey.shade300,
-                child: const Icon(Icons.person, color: Colors.grey),
+                width: 50,
+                height: 50,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: isDark
+                      ? Colors.white.withValues(alpha: 0.08)
+                      : Colors.grey.shade200,
+                ),
+                child: Icon(Icons.person_rounded,
+                    size: 24,
+                    color: isDark ? Colors.white38 : Colors.grey),
               ),
             ),
             const SizedBox(width: 14),
@@ -356,7 +373,7 @@ class _UserTile extends StatelessWidget {
                   Text(
                     user.fullName,
                     style: TextStyle(
-                      fontSize: 15,
+                      fontSize: 15.5,
                       fontWeight: FontWeight.w600,
                       color: isDark ? Colors.white : Colors.black87,
                     ),
@@ -366,16 +383,37 @@ class _UserTile extends StatelessWidget {
                     '@${user.username}',
                     style: TextStyle(
                       fontSize: 13,
-                      color: isDark ? Colors.white38 : Colors.black38,
+                      color: isDark ? Colors.white38 : Colors.black45,
                     ),
                   ),
+                  if (user.bio != null && user.bio!.isNotEmpty) ...[
+                    const SizedBox(height: 4),
+                    Text(
+                      user.bio!,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 12.5,
+                        color: isDark ? Colors.white24 : Colors.black26,
+                      ),
+                    ),
+                  ],
                 ],
               ),
             ),
-            Icon(
-              Icons.chat_bubble_outline_rounded,
-              size: 20,
-              color: colors.primary.withValues(alpha: 0.6),
+            const SizedBox(width: 10),
+            Container(
+              width: 36,
+              height: 36,
+              decoration: BoxDecoration(
+                color: colors.primary.withValues(alpha: isDark ? 0.15 : 0.08),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                Icons.chat_bubble_outline_rounded,
+                size: 17,
+                color: colors.primary,
+              ),
             ),
           ],
         ),

@@ -76,7 +76,12 @@ class _FollowListScreenState extends ConsumerState<FollowListScreen>
 
     return Scaffold(
       backgroundColor: bg,
-      body: NestedScrollView(
+      body: RefreshIndicator(
+        onRefresh: () async {
+          ref.invalidate(followersProvider(widget.userId));
+          ref.invalidate(followingProvider(widget.userId));
+        },
+        child: NestedScrollView(
         headerSliverBuilder: (context, _) => [
           SliverAppBar(
             pinned: true,
@@ -229,6 +234,7 @@ class _FollowListScreenState extends ConsumerState<FollowListScreen>
                   const Center(child: Text('Something went wrong')),
             ),
           ],
+        ),
         ),
       ),
     );

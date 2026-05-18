@@ -12,7 +12,20 @@
           "package_name": "com.likewise.app"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "501605932947-sab7fbc3p5frf0kpfp0484hl0qqv5pu7.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.likewise.app",
+            "certificate_hash": "f48ca68d4d46ffd5038d84cbe3f0b62f7c31c4ef"
+          }
+        },
+        {
+          "client_id": "501605932947-op8d0lgl152tc1ns17hii8m5r1vlakna.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
           "current_key": "AIzaSyAr2ElsuPyUJ1Gv0zV4fFrXn80psffJBZQ"
@@ -20,7 +33,70 @@
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "501605932947-op8d0lgl152tc1ns17hii8m5r1vlakna.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:501605932947:android:48ea5ce4c3a8d3913c9266",
+        "android_client_info": {
+          "package_name": "in.likewise.app"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "501605932947-op8d0lgl152tc1ns17hii8m5r1vlakna.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAr2ElsuPyUJ1Gv0zV4fFrXn80psffJBZQ"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "501605932947-op8d0lgl152tc1ns17hii8m5r1vlakna.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:501605932947:android:8a2aa1f69df96c533c9266",
+        "android_client_info": {
+          "package_name": "in.likewiseapp.admin"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "501605932947-op8d0lgl152tc1ns17hii8m5r1vlakna.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAr2ElsuPyUJ1Gv0zV4fFrXn80psffJBZQ"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "501605932947-op8d0lgl152tc1ns17hii8m5r1vlakna.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
         }
       }
     }

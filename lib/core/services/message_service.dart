@@ -15,7 +15,7 @@ class MessageService {
   Future<List<Conversation>> fetchConversations(String userId) async {
     final data = await _client
         .from('conversations')
-        .select('id, user1_id, user2_id, status, created_at, messages(id, content, created_at, sender_id, is_read)')
+        .select('id, user1_id, user2_id, status, created_at, messages(id, content, created_at, sender_id, is_read, deleted_at)')
         .or('user1_id.eq.$userId,and(user2_id.eq.$userId,status.eq.active)')
         .order('created_at', ascending: false);
 
@@ -27,20 +27,33 @@ class MessageService {
         .toSet()
         .toList();
 
-    final profileData = await _client
-        .from('profiles')
-        .select('id, username, full_name, avatar_url')
-        .inFilter('id', userIds);
+    // Fetch profiles and user's soft-deleted message IDs in parallel
+    final results = await Future.wait([
+      _client
+          .from('profiles')
+          .select('id, username, full_name, avatar_url')
+          .inFilter('id', userIds),
+      _client
+          .from('message_deletions')
+          .select('message_id')
+          .eq('user_id', userId),
+    ]);
 
     final profileMap = {
-      for (final p in profileData as List) p['id'] as String: p as Map<String, dynamic>
+      for (final p in results[0] as List) p['id'] as String: p as Map<String, dynamic>
     };
+    final myDeletedIds = (results[1] as List)
+        .map((e) => e['message_id'] as String)
+        .toSet();
 
     return rows.map((row) {
       final isUser1 = row['user1_id'] == userId;
       final otherId = isUser1 ? row['user2_id'] as String : row['user1_id'] as String;
       final other = profileMap[otherId];
-      final messages = (row['messages'] as List?) ?? [];
+      final messages = ((row['messages'] as List?) ?? [])
+          .where((m) =>
+              m['deleted_at'] == null && !myDeletedIds.contains(m['id']))
+          .toList();
 
       messages.sort((a, b) =>
           (a['created_at'] as String).compareTo(b['created_at'] as String));
@@ -99,6 +112,18 @@ class MessageService {
             .channel('convos_watch_$userId')
             .onPostgresChanges(
               event: PostgresChangeEvent.insert,
+              schema: 'public',
+              table: 'messages',
+              callback: (_) => refetch(),
+            )
+            .onPostgresChanges(
+              event: PostgresChangeEvent.update,
+              schema: 'public',
+              table: 'messages',
+              callback: (_) => refetch(),
+            )
+            .onPostgresChanges(
+              event: PostgresChangeEvent.delete,
               schema: 'public',
               table: 'messages',
               callback: (_) => refetch(),

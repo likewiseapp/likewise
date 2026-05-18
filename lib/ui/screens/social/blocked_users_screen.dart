@@ -140,7 +140,12 @@ class BlockedUsersScreen extends ConsumerWidget {
                     );
                   }
 
-                  return ListView.separated(
+                  return RefreshIndicator(
+                    onRefresh: () async {
+                      ref.invalidate(blockedUsersProvider);
+                    },
+                    child: ListView.separated(
+                    physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
                     padding: const EdgeInsets.symmetric(
                         horizontal: 20, vertical: 4),
                     itemCount: blocked.length,
@@ -261,6 +266,7 @@ class BlockedUsersScreen extends ConsumerWidget {
                         ),
                       );
                     },
+                  ),
                   );
                 },
               ),

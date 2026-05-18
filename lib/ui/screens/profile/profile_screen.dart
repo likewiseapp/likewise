@@ -107,8 +107,14 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
           final allHobbies = allHobbiesAsync.value ?? [];
 
           return SafeArea(
-            child: CustomScrollView(
-              physics: const BouncingScrollPhysics(),
+            child: RefreshIndicator(
+              onRefresh: () async {
+                ref.invalidate(currentProfileProvider);
+                ref.invalidate(userHobbiesProvider(userId));
+                ref.invalidate(allHobbiesProvider);
+              },
+              child: CustomScrollView(
+              physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
               slivers: [
                 // ── Sticky header: "Profile" + Settings shortcut ─────
                 SliverAppBar(
@@ -402,6 +408,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                   ),
                 ),
               ],
+            ),
             ),
           );
         },

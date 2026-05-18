@@ -6,14 +6,24 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/models/conversation.dart';
 import '../../../core/providers/auth_providers.dart';
+import '../../../core/providers/block_providers.dart';
 import '../../../core/providers/message_providers.dart';
+import '../../../core/services/block_service.dart';
+import '../../../core/services/message_service.dart';
 import '../../../core/app_theme.dart';
 import '../../../core/theme_provider.dart';
 import '../../widgets/app_cached_image.dart';
 
-class MessageRequestsScreen extends ConsumerWidget {
+class MessageRequestsScreen extends ConsumerStatefulWidget {
   const MessageRequestsScreen({super.key});
 
+  @override
+  ConsumerState<MessageRequestsScreen> createState() =>
+      _MessageRequestsScreenState();
+}
+
+class _MessageRequestsScreenState
+    extends ConsumerState<MessageRequestsScreen> {
   String _timeAgo(DateTime? date) {
     if (date == null) return '';
     final now = DateTime.now();
@@ -26,8 +36,130 @@ class MessageRequestsScreen extends ConsumerWidget {
     return '${diff.inDays ~/ 30}mo ago';
   }
 
+  Future<void> _deleteRequest(String conversationId) async {
+    final client = ref.read(supabaseProvider);
+    await MessageService(client).deleteConversation(conversationId);
+    ref.invalidate(requestConversationsProvider);
+    ref.invalidate(conversationsProvider);
+  }
+
+  Future<void> _blockAndDelete(
+      String conversationId, String otherUserId) async {
+    final client = ref.read(supabaseProvider);
+    final userId = ref.read(currentUserIdProvider);
+    if (userId == null) return;
+    await BlockService(client).blockUser(userId, otherUserId);
+    await MessageService(client).deleteConversation(conversationId);
+    ref.invalidate(requestConversationsProvider);
+    ref.invalidate(conversationsProvider);
+    ref.invalidate(blockedUsersProvider);
+  }
+
+  void _showActions(Conversation conv) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final otherId = conv.user1Id;
+    final name = conv.otherFullName ?? conv.otherUsername ?? 'this user';
+
+    HapticFeedback.mediumImpact();
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: isDark ? AppColors.darkSurface : Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 12, 20, 8),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 36,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade400,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              const SizedBox(height: 20),
+              _ActionTile(
+                icon: Icons.delete_outline_rounded,
+                label: 'Delete request',
+                color: isDark ? Colors.white : Colors.black87,
+                onTap: () {
+                  Navigator.pop(ctx);
+                  _deleteRequest(conv.id);
+                },
+              ),
+              _ActionTile(
+                icon: Icons.block_rounded,
+                label: 'Block $name',
+                color: Colors.red,
+                onTap: () async {
+                  Navigator.pop(ctx);
+                  final confirmed = await showDialog<bool>(
+                    context: context,
+                    builder: (dCtx) => AlertDialog(
+                      backgroundColor:
+                          isDark ? AppColors.darkSurface : Colors.white,
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(20)),
+                      title: Text(
+                        'Block $name?',
+                        style: TextStyle(
+                          fontWeight: FontWeight.w800,
+                          fontSize: 17,
+                          color: isDark ? Colors.white : Colors.black87,
+                        ),
+                      ),
+                      content: Text(
+                        'They won\'t be able to message you or see your profile.',
+                        style: TextStyle(
+                          fontSize: 14,
+                          height: 1.45,
+                          color: isDark ? Colors.white54 : Colors.black54,
+                        ),
+                      ),
+                      actions: [
+                        TextButton(
+                          onPressed: () => Navigator.pop(dCtx, false),
+                          child: Text(
+                            'Cancel',
+                            style: TextStyle(
+                              fontWeight: FontWeight.w600,
+                              color:
+                                  isDark ? Colors.white38 : Colors.black38,
+                            ),
+                          ),
+                        ),
+                        TextButton(
+                          onPressed: () => Navigator.pop(dCtx, true),
+                          child: const Text(
+                            'Block',
+                            style: TextStyle(
+                              fontWeight: FontWeight.w700,
+                              color: Colors.red,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                  if (confirmed == true && mounted) {
+                    _blockAndDelete(conv.id, otherId);
+                  }
+                },
+              ),
+              const SizedBox(height: 8),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     final colors = ref.watch(appColorSchemeProvider);
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final currentUserId = ref.watch(currentUserIdProvider);
@@ -72,8 +204,12 @@ class MessageRequestsScreen extends ConsumerWidget {
                 );
               }
 
-              return CustomScrollView(
-                physics: const BouncingScrollPhysics(),
+              return RefreshIndicator(
+                onRefresh: () async {
+                  ref.invalidate(requestConversationsProvider);
+                },
+                child: CustomScrollView(
+                physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
                 slivers: [
                   SliverToBoxAdapter(
                     child: SizedBox(
@@ -117,6 +253,7 @@ class MessageRequestsScreen extends ConsumerWidget {
                               '/chat/${conv.id}?name=$name&avatar=$avatar&userId=$userId&isRequest=true',
                             );
                           },
+                          onMore: () => _showActions(conv),
                         );
                       },
                       childCount: requests.length,
@@ -124,6 +261,7 @@ class MessageRequestsScreen extends ConsumerWidget {
                   ),
                   const SliverToBoxAdapter(child: SizedBox(height: 40)),
                 ],
+              ),
               );
             },
             loading: () => const Center(child: CircularProgressIndicator()),
@@ -192,6 +330,45 @@ class MessageRequestsScreen extends ConsumerWidget {
   }
 }
 
+class _ActionTile extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final Color color;
+  final VoidCallback onTap;
+
+  const _ActionTile({
+    required this.icon,
+    required this.label,
+    required this.color,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      behavior: HitTestBehavior.opaque,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 14),
+        child: Row(
+          children: [
+            Icon(icon, size: 22, color: color),
+            const SizedBox(width: 14),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.w600,
+                color: color,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _RequestTile extends StatelessWidget {
   final Conversation conversation;
   final AppColorScheme colors;
@@ -199,6 +376,7 @@ class _RequestTile extends StatelessWidget {
   final String? currentUserId;
   final String timeAgo;
   final VoidCallback onTap;
+  final VoidCallback? onMore;
 
   const _RequestTile({
     required this.conversation,
@@ -207,6 +385,7 @@ class _RequestTile extends StatelessWidget {
     required this.currentUserId,
     required this.timeAgo,
     required this.onTap,
+    this.onMore,
   });
 
   @override
@@ -292,13 +471,27 @@ class _RequestTile extends StatelessWidget {
               ),
             ),
             const SizedBox(width: 10),
-            Text(
-              timeAgo,
-              style: TextStyle(
-                fontSize: 11,
-                fontWeight: FontWeight.w500,
-                color: isDark ? Colors.white30 : Colors.black26,
-              ),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Text(
+                  timeAgo,
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w500,
+                    color: isDark ? Colors.white30 : Colors.black26,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                GestureDetector(
+                  onTap: onMore,
+                  child: Icon(
+                    Icons.more_horiz_rounded,
+                    size: 20,
+                    color: isDark ? Colors.white38 : Colors.black38,
+                  ),
+                ),
+              ],
             ),
           ],
         ),

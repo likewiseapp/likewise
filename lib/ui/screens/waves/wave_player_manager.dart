@@ -35,8 +35,17 @@ class WavePlayerManager {
   // ── Public API ─────────────────────────────────────────────────────────────
 
   /// Updates the wave list. Returns true if the list changed.
+  /// Disposes all old controllers so no audio leaks across filter changes.
   bool setWaves(List<Wave> waves) {
     if (_waves == waves) return false;
+    _loadGeneration++;
+    for (final c in controllers.values) {
+      c.dispose();
+    }
+    controllers.clear();
+    errors.clear();
+    currentIndex = 0;
+    firstVideoReady = false;
     _waves = waves;
     return true;
   }
